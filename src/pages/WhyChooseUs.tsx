@@ -24,15 +24,15 @@ export function WhyChooseUs() {
     <div className="relative bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
         <div className="text-center">
-          <h2 className="text-4xl font-bold text-fixup-black mb-16 flex items-center justify-center">
-            Pourquoi
+          <h2 className="text-3xl sm:text-4xl font-bold text-fixup-black mb-16 flex flex-col sm:flex-row items-center justify-center max-w-xs sm:max-w-none mx-auto">
+            <span>Pourquoi</span>
             <div className="relative mx-2">
               <div className="transform -rotate-6">
                 <span className="absolute inset-0 bg-[#f25C05] -z-10 rounded"></span>
                 <span className="relative z-10 inline-block px-4 text-white">nous</span>
               </div>
             </div>
-            choisir ?
+            <span>choisir&nbsp;?</span>
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 lg:gap-12">

@@ -33,14 +33,14 @@ export function HowItWorks() {
     <div className="py-32 px-4 bg-gray-100">
       <div className="max-w-7xl mx-auto">
         <div className="relative mb-20">
-          <h2 className="text-4xl font-bold text-fixup-black flex items-center justify-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-fixup-black flex flex-col sm:flex-row items-center justify-center max-w-xs sm:max-w-none mx-auto">
             <div className="relative mx-1">
               <div className="transform -rotate-6">
                 <span className="absolute inset-0 bg-[#f25C05] -z-10 rounded"></span>
                 <span className="relative z-10 inline-block px-4 text-white">Comment</span>
               </div>
             </div>
-            ça marche ?
+            <span>ça marche&nbsp;?</span>
           </h2>
         </div>
 
