@@ -63,27 +63,77 @@ export function Register() {
     }
 
     try {
-      const formDataToSend = new FormData();
-      Object.entries(formData).forEach(([key, value]) => {
-        if (value !== null && key !== 'confirmPassword') {
-          formDataToSend.append(key, value);
+      const hasFile = formData.attestation instanceof File;
+
+      let response: Response;
+
+      if (hasFile) {
+        // multipart/form-data si fichier présent
+        const formDataToSend = new FormData();
+        formDataToSend.append('Prenom', formData.firstName);
+        formDataToSend.append('Nom', formData.lastName);
+        formDataToSend.append('Email', formData.email);
+        formDataToSend.append('Adresse', formData.address);
+        formDataToSend.append('Code_postal', formData.postalCode);
+        formDataToSend.append('motdepasse', formData.password);
+        formDataToSend.append('Statut', 'actif');
+        formDataToSend.append('Role', formData.userType === 'professional' ? 'professionnel' : 'particulier');
+        if (formData.userType === 'professional' && formData.activityDomain) {
+          formDataToSend.append('Domaine_activite', formData.activityDomain);
         }
-      });
+        if (formData.attestation instanceof File) {
+          formDataToSend.append('Attestation', formData.attestation);
+        }
 
-      const response = await fetch(`${API_BASE_URL}/api/users/register`, {
-        method: 'POST',
-        body: formDataToSend
-      });
+        const debugEntries: Array<{ key: string; value: string }> = [];
+        for (const [k, v] of formDataToSend.entries()) {
+          if (v instanceof File) {
+            debugEntries.push({ key: k, value: `File(name=${v.name}, type=${v.type}, size=${v.size})` });
+          } else {
+            debugEntries.push({ key: k, value: String(v) });
+          }
+        }
+        console.log('FormData entries:', debugEntries);
 
-      if (response.status === 200) {
-        setSuccess('Inscription réussie ! Vous pouvez maintenant vous connecter.');
-        // Redirection vers la page de connexion après 2 secondes
+        response = await fetch(`${API_BASE_URL}/api/users/register`, {
+          method: 'POST',
+          body: formDataToSend
+        });
+      } else {
+        // application/x-www-form-urlencoded si aucun fichier
+        const urlParams = new URLSearchParams();
+        urlParams.append('Prenom', formData.firstName);
+        urlParams.append('Nom', formData.lastName);
+        urlParams.append('Email', formData.email);
+        urlParams.append('Adresse', formData.address);
+        urlParams.append('Code_postal', formData.postalCode);
+        urlParams.append('motdepasse', formData.password);
+        urlParams.append('Statut', 'actif');
+        urlParams.append('Role', formData.userType === 'professional' ? 'professionnel' : 'particulier');
+        if (formData.userType === 'professional' && formData.activityDomain) {
+          urlParams.append('Domaine_activite', formData.activityDomain);
+        }
+
+        console.log('URL-Encoded body:', urlParams.toString());
+
+        response = await fetch(`${API_BASE_URL}/api/users/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json'
+          },
+          body: urlParams.toString()
+        });
+      }
+
+      if (response.status === 200 || response.status === 201) {
+        setSuccess("Inscription réussie ! Vous pouvez maintenant vous connecter.");
         setTimeout(() => {
           window.location.href = '/login';
         }, 2000);
       } else {
-        const data = await response.json();
-        setError(data.message || 'Une erreur est survenue lors de l\'inscription');
+        const data = await response.json().catch(() => ({} as any));
+        setError((data && (data.message || data.error)) || "Une erreur est survenue lors de l'inscription");
       }
     } catch (err) {
       setError('Erreur de connexion au serveur');
