@@ -1,5 +1,5 @@
 import React from 'react';
-import logo from '../assets/Fixup-logo2.png';
+import logo from '../assets/logo_MDSU-M2_ORANGE-13.svg';
 
 
 export function Logo({ className = '', size = 'normal' }: { className?: string; size?: 'normal' | 'large' }) {

@@ -17,7 +17,7 @@ export interface Offer {
 export interface OfferFormData {
   description: string;
   type_reparation: RepairType;
-  photos: File[];
+  photos: File[]; // Fichiers pour FormData
   adresse_facturation: string;
   Code_postal: string;
   prix: string;

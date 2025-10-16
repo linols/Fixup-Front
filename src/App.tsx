@@ -10,7 +10,7 @@ import { Newsletter } from './components/Newsletter';
 import { Footer } from './components/Footer';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-import { CustomerDashboard } from './pages/CustomerDashboard';
+import { ParticulierDashboard } from './pages/ParticulierDashboard';
 import { ProfessionalDashboard } from './pages/ProfessionalDashboard';
 
 // Composant pour l'accès refusé
@@ -223,7 +223,7 @@ export function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={
             <PrivateRoute>
-              <CustomerDashboard />
+              <ParticulierDashboard />
             </PrivateRoute>
           } />
           <Route path="/professional-dashboard" element={
