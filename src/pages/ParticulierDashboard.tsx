@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Plus, Eye, FileText, Calendar, MapPin, Euro, User, Clock } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
 import { RepairType, OfferFormData } from '../types/offer';
+import { useOffers } from '../hooks/useOffers';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 // Interface pour les offres
 interface Offer {
@@ -36,54 +38,17 @@ export function ParticulierDashboard() {
     mode_paiement: 'CB'
   });
 
-  const [offers, setOffers] = useState<Offer[]>([]);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const userId = localStorage.getItem('userId');
-
-  // Charger les offres existantes
-  useEffect(() => {
-    const fetchOffers = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`${API_BASE_URL}/api/offers`);
-        if (response.ok) {
-          const data = await response.json();
-          
-          // Debug: Afficher les données reçues
-          console.log('Données reçues de l\'API:', data);
-          
-          const validOffers = data.map((offer: any) => {
-            console.log('Offre individuelle:', offer);
-            return {
-              ...offer,
-              type_reparation: offer.type_reparation || 'exterieur',
-              prix: offer.prix || '0',
-              adresse_facturation: offer.adresse_facturation || '',
-              Code_postal: offer.Code_postal || '',
-              // Mapping des champs utilisateur
-              Prenom: offer.Prenom || '',
-              Nom: offer.Nom || '',
-              nom_utilisateur: offer.nom_utilisateur || offer.user_name || offer.user_email || 'Utilisateur anonyme',
-              user_name: offer.user_name || offer.nom_utilisateur || 'Utilisateur inconnu',
-              user_email: offer.user_email || '',
-              status: offer.status || 'En attente'
-            };
-          });
-          setOffers(validOffers);
-        }
-      } catch (err) {
-        console.error('Erreur lors du chargement des offres:', err);
-        setError('Impossible de charger les demandes de réparation');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOffers();
-  }, []);
+  
+  // Utiliser le hook personnalisé avec cache
+  const { offers, loading, error, refresh } = useOffers({
+    cacheKey: 'particulier_offers',
+    cacheExpiration: 5 * 60 * 1000, // 5 minutes
+    autoFetch: true
+  });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -120,7 +85,7 @@ export function ParticulierDashboard() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setSubmitError('');
     setSuccess('');
 
     try {
@@ -158,16 +123,14 @@ export function ParticulierDashboard() {
           mode_paiement: 'CB'
         });
         setImagePreviews([]);
-        // Recharger les offres
-        const updatedResponse = await fetch(`${API_BASE_URL}/api/offers`);
-        const updatedOffers = await updatedResponse.json();
-        setOffers(updatedOffers);
+        // Recharger les offres (forcer le rafraîchissement)
+        refresh();
         setActiveTab('requests');
       } else {
-        setError('Une erreur est survenue lors de la création de la demande');
+        setSubmitError('Une erreur est survenue lors de la création de la demande');
       }
     } catch (err) {
-      setError('Erreur de connexion au serveur');
+      setSubmitError('Erreur de connexion au serveur');
       console.error(err);
     }
   };
@@ -302,13 +265,10 @@ export function ParticulierDashboard() {
         {/* Vue d'ensemble */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
-            {/* Section Debug - À supprimer en production */}
-            {process.env.NODE_ENV === 'development' && offers.length > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                <h3 className="text-sm font-semibold text-yellow-800 mb-2">Debug - Données reçues de l'API :</h3>
-                <pre className="text-xs text-yellow-700 overflow-auto max-h-40">
-                  {JSON.stringify(offers.slice(0, 2), null, 2)}
-                </pre>
+            {loading && <LoadingSpinner message="Chargement des données..." />}
+            {error && (
+              <div className="mb-6 p-4 text-sm text-red-700 bg-red-100 rounded-lg shadow-sm">
+                {error}
               </div>
             )}
             {/* Statistiques */}
@@ -453,9 +413,9 @@ export function ParticulierDashboard() {
             <div className="bg-white rounded-xl shadow-lg p-8 border border-fixup-blue/20">
               <h2 className="text-3xl font-bold text-fixup-black mb-8 text-center">Créer une nouvelle demande</h2>
 
-              {error && (
+              {submitError && (
                 <div className="mb-6 p-4 text-sm text-red-700 bg-red-100 rounded-lg shadow-sm">
-                  {error}
+                  {submitError}
                 </div>
               )}
               {success && (
@@ -619,10 +579,7 @@ export function ParticulierDashboard() {
               <h2 className="text-3xl font-bold text-fixup-black mb-8 text-center">Mes demandes de réparation</h2>
               
               {loading ? (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-fixup-blue mx-auto"></div>
-                  <p className="mt-4 text-fixup-black/70">Chargement des demandes...</p>
-                </div>
+                <LoadingSpinner message="Chargement des demandes..." />
               ) : offers.length === 0 ? (
                 <div className="text-center py-12">
                   <FileText className="w-16 h-16 text-fixup-blue/50 mx-auto mb-4" />

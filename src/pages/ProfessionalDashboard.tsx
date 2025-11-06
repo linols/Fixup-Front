@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { API_BASE_URL } from '../config/api';
 import { RepairType } from '../types/offer';
+import { useOffers } from '../hooks/useOffers';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 interface Offer {
   Id_devis: number;
@@ -16,37 +18,16 @@ interface Offer {
 }
 
 export function ProfessionalDashboard() {
-  const [offers, setOffers] = useState<Offer[]>([]);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [submitError, setSubmitError] = useState('');
   const userId = localStorage.getItem('userId');
 
-  // Charger les offres existantes
-  useEffect(() => {
-    fetchOffers();
-  }, []);
-
-  const fetchOffers = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/offers`);
-      if (response.ok) {
-        const data = await response.json();
-        const validOffers = data.map((offer: any) => ({
-          ...offer,
-          type_reparation: offer.type_reparation || 'exterieur',
-          prix: offer.prix || '0',
-          adresse_facturation: offer.adresse_facturation || '',
-          Code_postal: offer.Code_postal || '',
-          nom_utilisateur: offer.nom_utilisateur || 'Utilisateur anonyme',
-          status: offer.status || 'en_attente'
-        }));
-        setOffers(validOffers);
-      }
-    } catch (err) {
-      console.error('Erreur lors du chargement des offres:', err);
-      setError('Impossible de charger les demandes de réparation');
-    }
-  };
+  // Utiliser le hook personnalisé avec cache
+  const { offers, loading, error, refresh } = useOffers({
+    cacheKey: 'professional_offers',
+    cacheExpiration: 5 * 60 * 1000, // 5 minutes
+    autoFetch: true
+  });
 
   const handleTakeCharge = async (offerId: number) => {
     try {
@@ -62,13 +43,13 @@ export function ProfessionalDashboard() {
 
       if (response.ok) {
         setSuccess('Vous avez pris en charge cette demande avec succès !');
-        // Recharger les offres pour mettre à jour leur statut
-        fetchOffers();
+        // Recharger les offres pour mettre à jour leur statut (forcer le rafraîchissement)
+        refresh();
       } else {
-        setError('Une erreur est survenue lors de la prise en charge de la demande');
+        setSubmitError('Une erreur est survenue lors de la prise en charge de la demande');
       }
     } catch (err) {
-      setError('Erreur de connexion au serveur');
+      setSubmitError('Erreur de connexion au serveur');
       console.error(err);
     }
   };
@@ -78,9 +59,15 @@ export function ProfessionalDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-4xl font-bold text-fixup-black mb-8 text-center">Demandes de réparation disponibles</h1>
 
+        {loading && <LoadingSpinner message="Chargement des demandes..." />}
         {error && (
           <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg shadow-sm">
             {error}
+          </div>
+        )}
+        {submitError && (
+          <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg shadow-sm">
+            {submitError}
           </div>
         )}
         {success && (
@@ -89,6 +76,7 @@ export function ProfessionalDashboard() {
           </div>
         )}
 
+        {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {offers.map((offer) => (
             <div key={offer.Id_devis} className="bg-white rounded-xl shadow-lg overflow-hidden border border-fixup-blue/20">
@@ -181,6 +169,7 @@ export function ProfessionalDashboard() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

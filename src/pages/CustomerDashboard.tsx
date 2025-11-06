@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { API_BASE_URL } from '../config/api';
 import { RepairType, OfferFormData } from '../types/offer';
+import { useOffers } from '../hooks/useOffers';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 // Mise à jour du type Offer pour correspondre aux données de l'API
 interface Offer {
@@ -26,38 +28,16 @@ export function CustomerDashboard() {
     mode_paiement: 'CB'
   });
 
-  const [offers, setOffers] = useState<Offer[]>([]);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [submitError, setSubmitError] = useState('');
   const userId = localStorage.getItem('userId');
 
-  // Charger les offres existantes
-  useEffect(() => {
-    const fetchOffers = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/offers`);
-        if (response.ok) {
-          const data = await response.json();
-          // Vérifier et nettoyer les données
-          const validOffers = data.map((offer: any) => ({
-            ...offer,
-            // Valeurs par défaut pour les champs optionnels
-            type_reparation: offer.type_reparation || 'exterieur',
-            prix: offer.prix || '0',
-            adresse_facturation: offer.adresse_facturation || '',
-            Code_postal: offer.Code_postal || '',
-            nom_utilisateur: offer.nom_utilisateur || 'Utilisateur anonyme'
-          }));
-          setOffers(validOffers);
-        }
-      } catch (err) {
-        console.error('Erreur lors du chargement des offres:', err);
-        setError('Impossible de charger les demandes de réparation');
-      }
-    };
-
-    fetchOffers();
-  }, []);
+  // Utiliser le hook personnalisé avec cache
+  const { offers, loading, error, refresh } = useOffers({
+    cacheKey: 'customer_offers',
+    cacheExpiration: 5 * 60 * 1000, // 5 minutes
+    autoFetch: true
+  });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -78,7 +58,7 @@ export function CustomerDashboard() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setSubmitError('');
     setSuccess('');
 
     try {
@@ -113,15 +93,13 @@ export function CustomerDashboard() {
           prix: '',
           mode_paiement: 'CB'
         });
-        // Recharger les offres
-        const updatedResponse = await fetch(`${API_BASE_URL}/api/offers`);
-        const updatedOffers = await updatedResponse.json();
-        setOffers(updatedOffers);
+        // Recharger les offres (forcer le rafraîchissement)
+        refresh();
       } else {
-        setError('Une erreur est survenue lors de la création de la demande');
+        setSubmitError('Une erreur est survenue lors de la création de la demande');
       }
     } catch (err) {
-      setError('Erreur de connexion au serveur');
+      setSubmitError('Erreur de connexion au serveur');
       console.error(err);
     }
   };
@@ -130,8 +108,15 @@ export function CustomerDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-fixup-white to-fixup-blue/10 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto">
+          {loading && <LoadingSpinner message="Chargement des demandes..." />}
+          {error && (
+            <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg shadow-sm">
+              {error}
+            </div>
+          )}
           <div className="mb-16">
             <h2 className="text-3xl font-bold text-fixup-black mb-8 text-center">Dernières demandes de réparation</h2>
+            {!loading && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {offers.map((offer) => (
                 <div key={offer.Id_devis} className="bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:scale-105 hover:shadow-xl border border-fixup-blue/20">
@@ -212,13 +197,14 @@ export function CustomerDashboard() {
                 </div>
               )}
             </div>
+            )}
           </div>
 
           <h1 className="text-4xl font-bold text-fixup-black mb-8 text-center">Créer une demande de réparation</h1>
 
-          {error && (
+          {submitError && (
             <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg shadow-sm">
-              {error}
+              {submitError}
             </div>
           )}
           {success && (
