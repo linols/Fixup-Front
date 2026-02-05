@@ -1,5 +1,5 @@
 import React from 'react';
-import { Facebook, Twitter, Instagram, Youtube } from 'lucide-react';
+import { Facebook, Instagram, Linkedin } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -52,13 +52,10 @@ export function Footer() {
                 <Facebook className="w-6 h-6" />
               </a>
               <a href="#" className="text-gray-600 hover:text-fixup-green">
-                <Twitter className="w-6 h-6" />
-              </a>
-              <a href="#" className="text-gray-600 hover:text-fixup-green">
                 <Instagram className="w-6 h-6" />
               </a>
               <a href="#" className="text-gray-600 hover:text-fixup-green">
-                <Youtube className="w-6 h-6" />
+                <Linkedin className="w-6 h-6" />
               </a>
             </div>
           </div>
