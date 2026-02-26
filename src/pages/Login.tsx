@@ -33,14 +33,17 @@ export function Login() {
 
       if (response.status === 200) {
         const data: LoginResponse = await response.json();
-        
+
         // Stocker les informations de l'utilisateur
         localStorage.setItem('userId', data.userId.toString());
         localStorage.setItem('userRole', data.role);
         localStorage.setItem('isAuthenticated', 'true');
+        // Avatar anonyme aléatoire (1 à 4)
+        const randomAvatar = Math.floor(Math.random() * 4) + 1;
+        localStorage.setItem('userAvatar', randomAvatar.toString());
 
         console.log('Connexion réussie');
-        
+
         // Rediriger vers le tableau de bord
         navigate('/dashboard');
       } else {

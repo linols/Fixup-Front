@@ -2,16 +2,25 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { LogIn, CircleUser, Users, HelpCircle, MessageCircle } from 'lucide-react';
 import { Logo } from './components/Logo';
+import avatar1 from './assets/pp-anonymes_Fixaly-01.png';
+import avatar2 from './assets/pp-anonymes_Fixaly-02.png';
+import avatar3 from './assets/pp-anonymes_Fixaly-03.png';
+import avatar4 from './assets/pp-anonymes_Fixaly-04.png';
+
+const avatars: Record<string, string> = { '1': avatar1, '2': avatar2, '3': avatar3, '4': avatar4 };
 import { BackgroundShapes } from './components/BackgroundShapes';
 import { WhyChooseUs } from './pages/WhyChooseUs';
 import { HowItWorks } from './pages/HowItWorks';
 import { LatestRequests } from './pages/LatestRequests';
+import { ClientReviews } from './pages/ClientReviews';
 import { Newsletter } from './components/Newsletter';
 import { Footer } from './components/Footer';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { ParticulierDashboard } from './pages/ParticulierDashboard';
 import { ProfessionalDashboard } from './pages/ProfessionalDashboard';
+import { TrouverArtisan } from './pages/TrouverArtisan';
+import { ProfilArtisan } from './pages/ProfilArtisan';
 
 // Composant pour l'accès refusé
 function AccessDenied() {
@@ -21,7 +30,7 @@ function AccessDenied() {
         <div className="text-center">
           <h1 className="text-4xl font-bold text-fixup-black mb-4">Accès refusé</h1>
           <p className="text-xl text-fixup-black/70 mb-8">Cette page est réservée aux professionnels</p>
-          <Link 
+          <Link
             to="/"
             className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-fixup-blue hover:bg-fixup-blue/90 transition-colors duration-200"
           >
@@ -67,6 +76,7 @@ function PrivateRoute({ children, requiresProfessional = false }: { children: Re
 }
 
 function HomePage() {
+  const navigate = useNavigate();
   return (
     <>
       {/* Hero Section */}
@@ -76,14 +86,17 @@ function HomePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-16">
             <div className="text-center relative z-10">
               <div className="max-w-2xl mx-auto mb-12">
-                <Logo size="large" className="w-full" />
+                <Logo size="large" variant="hero" className="w-full" />
               </div>
               <p className="mt-8 max-w-md mx-auto text-xl text-fixup-black font-coolvetica">
                 Connectez-vous avec les meilleurs artisans de votre région
               </p>
-              
+
               <div className="mt-10 flex justify-center space-x-6">
-                <button className="px-8 py-3 bg-fixup-green text-fixup-black font-medium rounded-lg shadow-lg hover:bg-fixup-orange transform hover:-translate-y-1 transition-all duration-200">
+                <button
+                  onClick={() => navigate('/trouver-artisan')}
+                  className="px-8 py-3 bg-fixup-green text-fixup-black font-medium rounded-lg shadow-lg hover:bg-fixup-orange transform hover:-translate-y-1 transition-all duration-200"
+                >
                   Trouver un artisan
                 </button>
                 <button className="px-8 py-3 bg-fixup-blue text-fixup-black font-medium rounded-lg shadow-lg hover:bg-fixup-orange transform hover:-translate-y-1 transition-all duration-200">
@@ -104,6 +117,9 @@ function HomePage() {
       {/* Latest Requests Section */}
       <LatestRequests />
 
+      {/* Client Reviews Section */}
+      <ClientReviews />
+
       {/* Newsletter Section */}
       <Newsletter />
 
@@ -121,7 +137,7 @@ function NavLink({ icon, text, colorIndex, onClick }: { icon: React.ReactNode; t
   ];
 
   return (
-    <button 
+    <button
       onClick={onClick}
       className={`inline-flex items-center text-fixup-black ${hoverColors[colorIndex]} transition-colors duration-200`}
     >
@@ -135,6 +151,8 @@ function Navigation() {
   const navigate = useNavigate();
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
   const userRole = localStorage.getItem('userRole');
+  const avatarIndex = localStorage.getItem('userAvatar') ?? '1';
+  const userAvatarSrc = avatars[avatarIndex] ?? avatar1;
 
   const handleLogout = () => {
     localStorage.removeItem('userId');
@@ -164,23 +182,23 @@ function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex-shrink-0">
-            <Link to="/">
+            <Link to="/" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
               <Logo className="w-32" />
             </Link>
           </div>
           <div className="hidden md:flex items-center justify-between flex-1">
             {/* Liens centrés */}
             <div className="flex justify-center space-x-8 flex-1">
-              <NavLink 
-                icon={<CircleUser className="w-4 h-4" />} 
-                text="Artisan" 
+              <NavLink
+                icon={<CircleUser className="w-4 h-4" />}
+                text="Artisan"
                 colorIndex={0}
                 onClick={handleArtisanClick}
               />
-              <NavLink 
-                icon={<Users className="w-4 h-4" />} 
-                text="Particulier" 
-                colorIndex={1} 
+              <NavLink
+                icon={<Users className="w-4 h-4" />}
+                text="Particulier"
+                colorIndex={1}
                 onClick={handleParticulierClick}
               />
               <NavLink icon={<HelpCircle className="w-4 h-4" />} text="Comment ça marche ?" colorIndex={2} />
@@ -190,15 +208,19 @@ function Navigation() {
             {/* Connexion/Déconnexion aligné à droite */}
             <div className="ml-8">
               {isAuthenticated ? (
-                <button 
+                <button
                   onClick={handleLogout}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-fixup-black bg-fixup-green hover:bg-fixup-orange transition-colors duration-200"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-full text-sm font-medium text-fixup-black bg-white hover:bg-gray-50 hover:border-fixup-orange transition-all duration-200 shadow-sm"
                 >
-                  <LogIn className="w-4 h-4 mr-2" />
-                  Déconnexion
+                  <img
+                    src={userAvatarSrc}
+                    alt="avatar"
+                    className="w-7 h-7 rounded-full object-cover"
+                  />
+                  <span className="text-xs text-gray-500">Déconnexion</span>
                 </button>
               ) : (
-                <button 
+                <button
                   onClick={() => navigate('/login')}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-fixup-black bg-fixup-green hover:bg-fixup-orange transition-colors duration-200"
                 >
@@ -231,6 +253,24 @@ export function App() {
               <ProfessionalDashboard />
             </PrivateRoute>
           } />
+          <Route
+            path="/trouver-artisan"
+            element={
+              <>
+                <Navigation />
+                <TrouverArtisan />
+              </>
+            }
+          />
+          <Route
+            path="/artisan/:id"
+            element={
+              <>
+                <Navigation />
+                <ProfilArtisan />
+              </>
+            }
+          />
           <Route
             path="/*"
             element={

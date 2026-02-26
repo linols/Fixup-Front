@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 135" fill="none">
+  <style>
+    .txt {
+      font-family: 'Arial Black', 'Arial Bold', 'Helvetica Neue', Impact, sans-serif;
+      font-weight: 900;
+      font-size: 118px;
+      fill: #111111;
+      letter-spacing: -2px;
+    }
+  </style>
+
+  <!-- "Fix" -->
+  <text class="txt" x="0" y="118">Fix</text>
+
+  <!-- Orange figure replacing 'a' -->
+  <!-- Head (circle) -->
+  <circle cx="268" cy="24" r="20" fill="#E85500"/>
+  <!-- Body: X shape (two crossing thick lines) -->
+  <line x1="234" y1="52" x2="304" y2="122" stroke="#E85500" stroke-width="26" stroke-linecap="round"/>
+  <line x1="304" y1="52" x2="234" y2="122" stroke="#E85500" stroke-width="26" stroke-linecap="round"/>
+
+  <!-- "ly" -->
+  <text class="txt" x="316" y="118">ly</text>
+</svg>
