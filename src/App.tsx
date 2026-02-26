@@ -6,8 +6,6 @@ import avatar1 from './assets/pp-anonymes_Fixaly-01.png';
 import avatar2 from './assets/pp-anonymes_Fixaly-02.png';
 import avatar3 from './assets/pp-anonymes_Fixaly-03.png';
 import avatar4 from './assets/pp-anonymes_Fixaly-04.png';
-
-const avatars: Record<string, string> = { '1': avatar1, '2': avatar2, '3': avatar3, '4': avatar4 };
 import { BackgroundShapes } from './components/BackgroundShapes';
 import { WhyChooseUs } from './pages/WhyChooseUs';
 import { HowItWorks } from './pages/HowItWorks';
@@ -21,6 +19,8 @@ import { ParticulierDashboard } from './pages/ParticulierDashboard';
 import { ProfessionalDashboard } from './pages/ProfessionalDashboard';
 import { TrouverArtisan } from './pages/TrouverArtisan';
 import { ProfilArtisan } from './pages/ProfilArtisan';
+
+const avatars: Record<string, string> = { '1': avatar1, '2': avatar2, '3': avatar3, '4': avatar4 };
 
 // Composant pour l'accès refusé
 function AccessDenied() {

@@ -29,7 +29,7 @@ interface Offer {
 
 export function ParticulierDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'create' | 'requests'>('overview');
+  const [activeTab, setActiveTab] = useState<'home' | 'create' | 'requests'>('home');
   const [formData, setFormData] = useState<OfferFormData>({
     description: '',
     type_reparation: 'exterieur',
@@ -222,22 +222,22 @@ export function ParticulierDashboard() {
           <div className="bg-white rounded-xl shadow-lg p-2 border border-fixup-blue/20">
             <div className="flex space-x-2">
               <button
-                onClick={() => setActiveTab('overview')}
-                className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${activeTab === 'overview'
-                    ? 'bg-fixup-blue text-white shadow-md'
-                    : 'text-fixup-black hover:bg-fixup-blue/10'
+                onClick={() => setActiveTab('home')}
+                className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${activeTab === 'home'
+                  ? 'bg-fixup-blue text-white shadow-md'
+                  : 'text-fixup-black hover:bg-fixup-blue/10'
                   }`}
               >
                 <div className="flex items-center space-x-2">
-                  <Eye className="w-4 h-4" />
-                  <span>Vue d'ensemble</span>
+                  <Search className="w-4 h-4" />
+                  <span>Trouver un artisan</span>
                 </div>
               </button>
               <button
                 onClick={() => setActiveTab('create')}
                 className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${activeTab === 'create'
-                    ? 'bg-fixup-blue text-white shadow-md'
-                    : 'text-fixup-black hover:bg-fixup-blue/10'
+                  ? 'bg-fixup-blue text-white shadow-md'
+                  : 'text-fixup-black hover:bg-fixup-blue/10'
                   }`}
               >
                 <div className="flex items-center space-x-2">
@@ -248,8 +248,8 @@ export function ParticulierDashboard() {
               <button
                 onClick={() => setActiveTab('requests')}
                 className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${activeTab === 'requests'
-                    ? 'bg-fixup-blue text-white shadow-md'
-                    : 'text-fixup-black hover:bg-fixup-blue/10'
+                  ? 'bg-fixup-blue text-white shadow-md'
+                  : 'text-fixup-black hover:bg-fixup-blue/10'
                   }`}
               >
                 <div className="flex items-center space-x-2">
@@ -261,160 +261,39 @@ export function ParticulierDashboard() {
           </div>
         </div>
 
-        {/* Vue d'ensemble */}
-        {activeTab === 'overview' && (
-          <div className="space-y-8">
-            {loading && <LoadingSpinner message="Chargement des données..." />}
-            {error && (
-              <div className="mb-6 p-4 text-sm text-red-700 bg-red-100 rounded-lg shadow-sm">
-                {error}
-              </div>
-            )}
-            {/* Statistiques */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-white rounded-xl shadow-lg p-6 border border-fixup-blue/20">
-                <div className="flex items-center">
-                  <div className="p-3 bg-fixup-green/10 rounded-lg">
-                    <FileText className="w-6 h-6 text-fixup-green" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-fixup-black/70">Total des demandes</p>
-                    <p className="text-2xl font-bold text-fixup-black">{offers.length}</p>
-                  </div>
+        {/* Accueil */}
+        {activeTab === 'home' && (
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-white rounded-xl shadow-lg p-10 border border-fixup-blue/20 text-center">
+              <div className="mb-8">
+                <div className="p-4 bg-fixup-orange/10 rounded-full inline-flex mb-4">
+                  <Search className="w-10 h-10 text-fixup-orange" />
                 </div>
+                <p className="text-lg text-fixup-black/70 leading-relaxed">
+                  Vous pouvez chercher un artisan qui vous correspond ici :
+                </p>
               </div>
-              <div className="bg-white rounded-xl shadow-lg p-6 border border-fixup-blue/20">
-                <div className="flex items-center">
-                  <div className="p-3 bg-fixup-orange/10 rounded-lg">
-                    <Clock className="w-6 h-6 text-fixup-orange" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-fixup-black/70">En attente</p>
-                    <p className="text-2xl font-bold text-fixup-black">{offers.filter(o => o.status === 'En attente').length}</p>
-                  </div>
+              <button
+                onClick={() => navigate('/trouver-artisan')}
+                className="px-8 py-4 bg-fixup-blue text-white font-semibold rounded-xl hover:bg-fixup-blue/90 transition-all duration-200 text-lg mb-10"
+              >
+                <div className="flex items-center space-x-3">
+                  <Search className="w-5 h-5" />
+                  <span>Trouver un artisan</span>
                 </div>
-              </div>
-              <div className="bg-white rounded-xl shadow-lg p-6 border border-fixup-blue/20">
-                <div className="flex items-center">
-                  <div className="p-3 bg-fixup-blue/10 rounded-lg">
-                    <Euro className="w-6 h-6 text-fixup-blue" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-fixup-black/70">Budget moyen</p>
-                    <p className="text-2xl font-bold text-fixup-black">
-                      {offers.length > 0
-                        ? Math.round(offers.reduce((sum, o) => sum + parseInt(o.prix || '0'), 0) / offers.length)
-                        : 0
-                      }€
-                    </p>
-                  </div>
-                </div>
+              </button>
+              <div className="border-t border-fixup-blue/10 pt-8">
+                <p className="text-lg text-fixup-black/70 leading-relaxed">
+                  Ou alors poster une annonce concernant votre demande et attendre qu'un artisan réponde en allant dans l'onglet{' '}
+                  <button
+                    onClick={() => setActiveTab('create')}
+                    className="text-fixup-blue font-semibold hover:underline"
+                  >
+                    "Créer une demande"
+                  </button>
+                </p>
               </div>
             </div>
-
-            {/* Actions rapides */}
-            <div className="bg-white rounded-xl shadow-lg p-8 border border-fixup-blue/20">
-              <h2 className="text-2xl font-bold text-fixup-black mb-6">Actions rapides</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <button
-                  onClick={() => setActiveTab('create')}
-                  className="p-6 bg-gradient-to-r from-fixup-green to-fixup-orange rounded-xl text-white hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
-                >
-                  <div className="flex items-center space-x-4">
-                    <Plus className="w-8 h-8" />
-                    <div className="text-left">
-                      <h3 className="text-lg font-semibold">Créer une nouvelle demande</h3>
-                      <p className="text-white/80">Décrivez votre problème et trouvez un artisan</p>
-                    </div>
-                  </div>
-                </button>
-                <button
-                  onClick={() => setActiveTab('requests')}
-                  className="p-6 bg-gradient-to-r from-fixup-blue to-fixup-green rounded-xl text-white hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
-                >
-                  <div className="flex items-center space-x-4">
-                    <Eye className="w-8 h-8" />
-                    <div className="text-left">
-                      <h3 className="text-lg font-semibold">Voir mes demandes</h3>
-                      <p className="text-white/80">Consultez l'état de vos demandes</p>
-                    </div>
-                  </div>
-                </button>
-                <button
-                  onClick={() => navigate('/trouver-artisan')}
-                  className="p-6 bg-gradient-to-r from-fixup-orange to-fixup-green rounded-xl text-white hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 md:col-span-2"
-                >
-                  <div className="flex items-center space-x-4">
-                    <Search className="w-8 h-8" />
-                    <div className="text-left">
-                      <h3 className="text-lg font-semibold">Trouver un artisan</h3>
-                      <p className="text-white/80">Recherchez un artisan près de chez vous</p>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* Dernières demandes */}
-            {offers.length > 0 && (
-              <div className="bg-white rounded-xl shadow-lg p-8 border border-fixup-blue/20">
-                <h2 className="text-2xl font-bold text-fixup-black mb-6">Dernières demandes</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {offers.slice(0, 3).map((offer) => {
-                    const imageUrl = getImageUrl(offer);
-                    return (
-                      <div key={offer.Id_devis} className="bg-fixup-white rounded-lg shadow-md overflow-hidden border border-fixup-blue/20 hover:shadow-lg transition-shadow duration-200">
-                        <div className="h-32 bg-cover bg-center" style={{
-                          backgroundImage: `url(${imageUrl || getCategoryImage(offer.type_reparation || 'exterieur')})`
-                        }}>
-                          <div className="h-full bg-black/20 flex items-end">
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-fixup-green/90 text-white m-3">
-                              {offer.prix ? `${offer.prix}€` : 'Prix non défini'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-lg font-semibold text-fixup-black">
-                              {getCategoryName(offer.type_reparation || 'exterieur')}
-                            </h3>
-                            <div className="text-right">
-                              <div className="text-sm font-bold text-fixup-green">
-                                {offer.prix && offer.prix !== '0' ? `${offer.prix}€` : 'Prix N/A'}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center text-xs text-fixup-black/70 mb-2">
-                            <User className="w-3 h-3 mr-1" />
-                            <span>{getUserDisplayName(offer)}</span>
-                          </div>
-                          <p className="text-sm text-fixup-black/70 mb-3 line-clamp-2">
-                            {offer.description || 'Aucune description'}
-                          </p>
-                          <div className="flex items-center justify-between text-xs text-fixup-black/60 mb-2">
-                            <div className="flex items-center">
-                              <MapPin className="w-3 h-3 mr-1" />
-                              <span>{offer.Code_postal || 'N/A'}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Calendar className="w-3 h-3 mr-1" />
-                              <span>{new Date(offer.Date).toLocaleDateString('fr-FR')}</span>
-                            </div>
-                          </div>
-                          {offer.status && (
-                            <div className="flex justify-center">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(offer.status)}`}>
-                                {offer.status}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         )}
 

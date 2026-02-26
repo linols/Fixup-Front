@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { RepairType } from '../types/offer';
 import { API_BASE_URL } from '../config/api';
 
 interface Offer {
@@ -6,7 +7,7 @@ interface Offer {
   description: string;
   Date: string;
   Id_user: number;
-  type_reparation?: string;
+  type_reparation?: RepairType;
   prix?: string;
   adresse_facturation?: string;
   Code_postal?: string;
@@ -80,13 +81,13 @@ export function useOffers(options: UseOffersOptions = {}) {
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/offers`);
-      
+
       if (!response.ok) {
         throw new Error(`Erreur HTTP: ${response.status}`);
       }
 
       const data = await response.json();
-      
+
       // Nettoyer et valider les données
       const validOffers = data.map((offer: any) => ({
         ...offer,
@@ -108,7 +109,7 @@ export function useOffers(options: UseOffersOptions = {}) {
     } catch (err) {
       console.error('Erreur lors du chargement des offres:', err);
       setError('Impossible de charger les demandes de réparation');
-      
+
       // En cas d'erreur, essayer d'utiliser le cache même s'il est expiré
       const cached = getCachedData();
       if (cached) {
