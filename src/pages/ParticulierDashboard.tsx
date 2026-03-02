@@ -1,43 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Eye, FileText, Calendar, MapPin, Euro, User, Clock, Search } from 'lucide-react';
+import { Plus, FileText, Calendar, MapPin, User, Search } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
-import { RepairType, OfferFormData } from '../types/offer';
-import { useOffers } from '../hooks/useOffers';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { fetchUserDemandes, postDemande } from '../services/api';
+import type { Demande } from '../types/types';
 
-// Interface pour les offres
-interface Offer {
-  Id_devis: number;
+interface DemandeFormData {
+  titre: string;
   description: string;
-  Date: string;
-  Id_user: number;
-  type_reparation?: RepairType;
-  prix?: string;
-  adresse_facturation?: string;
-  Code_postal?: string;
-  nom_utilisateur?: string;
-  // Champs utilisateur complets
-  Prenom?: string;
-  Nom?: string;
-  user_name?: string;
-  user_email?: string;
-  status?: string;
-  // Image de l'offre
-  Image?: string;
+  type_reparation: string;
+  photos: File[];
+  adresse: string;
 }
 
 export function ParticulierDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'home' | 'create' | 'requests'>('home');
-  const [formData, setFormData] = useState<OfferFormData>({
+  const [formData, setFormData] = useState<DemandeFormData>({
+    titre: '',
     description: '',
-    type_reparation: 'exterieur',
-    photos: [], // Tableau de fichiers File[]
-    adresse_facturation: '',
-    Code_postal: '',
-    prix: '',
-    mode_paiement: 'CB'
+    type_reparation: 'Produits électroniques',
+    photos: [],
+    adresse: '',
   });
 
   const [success, setSuccess] = useState('');
@@ -45,12 +30,32 @@ export function ParticulierDashboard() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const userId = localStorage.getItem('userId');
 
-  // Utiliser le hook personnalisé avec cache
-  const { offers, loading, error, refresh } = useOffers({
-    cacheKey: 'particulier_offers',
-    cacheExpiration: 5 * 60 * 1000, // 5 minutes
-    autoFetch: true
-  });
+  const [demandes, setDemandes] = useState<Demande[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadDemandes = useCallback(async () => {
+    if (!userId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchUserDemandes(userId);
+      setDemandes(data);
+    } catch (err) {
+      console.error('Erreur chargement demandes:', err);
+      setError('Impossible de charger vos demandes');
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    loadDemandes();
+  }, [loadDemandes]);
+
+  const refresh = useCallback(() => {
+    loadDemandes();
+  }, [loadDemandes]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -91,54 +96,42 @@ export function ParticulierDashboard() {
     setSuccess('');
 
     try {
-      // Créer FormData (pas JSON !)
       const formDataToSend = new FormData();
+      formDataToSend.append('id_user', userId || '');
+      formDataToSend.append('titre', formData.titre);
       formDataToSend.append('description', formData.description);
-      formDataToSend.append('idUtilisateur', userId || '');
-      formDataToSend.append('Code_postal', formData.Code_postal);
-      formDataToSend.append('adresse_facturation', formData.adresse_facturation);
-      formDataToSend.append('Date', new Date().toISOString().split('T')[0]);
-      formDataToSend.append('prix', formData.prix);
-      formDataToSend.append('mode_paiement', formData.mode_paiement);
       formDataToSend.append('type_reparation', formData.type_reparation);
+      formDataToSend.append('adresse', formData.adresse);
 
-      // Ajouter le fichier image
-      if (formData.photos && formData.photos.length > 0) {
-        formDataToSend.append('image', formData.photos[0]); // Le champ doit s'appeler 'image'
-      }
-
-      const response = await fetch(`${API_BASE_URL}/api/offers`, {
-        method: 'POST',
-        // Pas de Content-Type, le navigateur gère multipart/form-data
-        body: formDataToSend
+      // Ajouter les fichiers images
+      formData.photos.forEach(file => {
+        formDataToSend.append('photos', file);
       });
 
-      if (response.ok) {
-        setSuccess('Votre demande a été créée avec succès !');
-        setFormData({
-          description: '',
-          type_reparation: 'exterieur',
-          photos: [], // Réinitialiser le tableau de fichiers
-          adresse_facturation: '',
-          Code_postal: '',
-          prix: '',
-          mode_paiement: 'CB'
-        });
-        setImagePreviews([]);
-        // Recharger les offres (forcer le rafraîchissement)
-        refresh();
-        setActiveTab('requests');
-      } else {
-        setSubmitError('Une erreur est survenue lors de la création de la demande');
-      }
+      await postDemande(formDataToSend);
+
+      setSuccess('Votre demande a été créée avec succès !');
+      setFormData({
+        titre: '',
+        description: '',
+        type_reparation: 'Produits électroniques',
+        photos: [],
+        adresse: '',
+      });
+      setImagePreviews([]);
+      refresh();
+      setActiveTab('requests');
     } catch (err) {
-      setSubmitError('Erreur de connexion au serveur');
+      setSubmitError('Une erreur est survenue lors de la création de la demande');
       console.error(err);
     }
   };
 
   const getCategoryImage = (type: string) => {
     const images = {
+      'Produits électroniques': '/images/categories/electronique.jpg',
+      'Gros électroménager': '/images/categories/bois.jpg',
+      'Petit électroménager': '/images/categories/informatique.jpg',
       'exterieur': '/images/categories/exterieur.jpg',
       'informatique': '/images/categories/informatique.jpg',
       'electronique': '/images/categories/electronique.jpg',
@@ -149,6 +142,9 @@ export function ParticulierDashboard() {
 
   const getCategoryName = (type: string) => {
     const names = {
+      'Produits électroniques': 'Produits électroniques',
+      'Gros électroménager': 'Gros électroménager',
+      'Petit électroménager': 'Petit électroménager',
       'exterieur': 'Extérieur',
       'informatique': 'Informatique',
       'electronique': 'Électronique',
@@ -157,22 +153,12 @@ export function ParticulierDashboard() {
     return names[type as keyof typeof names] || type;
   };
 
-  // Fonction pour obtenir le nom complet de l'utilisateur
-  const getUserDisplayName = (offer: Offer) => {
-    // Priorité 1: Prenom + Nom
-    if (offer.Prenom && offer.Nom) {
-      return `${offer.Prenom} ${offer.Nom}`;
+  // Fonction pour obtenir le nom complet de l'artisan "assigné" (si existant)
+  const getArtisanDisplayName = (demande: Demande) => {
+    if (demande.artisan_Prenom && demande.artisan_Nom) {
+      return `${demande.artisan_Prenom} ${demande.artisan_Nom}`;
     }
-    // Priorité 2: user_name
-    if (offer.user_name && offer.user_name !== 'Utilisateur inconnu') {
-      return offer.user_name;
-    }
-    // Priorité 3: nom_utilisateur
-    if (offer.nom_utilisateur && offer.nom_utilisateur !== 'Utilisateur anonyme') {
-      return offer.nom_utilisateur;
-    }
-    // Fallback
-    return 'Utilisateur inconnu';
+    return 'Artisan non assigné';
   };
 
   // Fonction pour obtenir la couleur du statut
@@ -194,12 +180,10 @@ export function ParticulierDashboard() {
     }
   };
 
-  // Fonction pour obtenir l'URL de l'image (stockée en BLOB)
-  const getImageUrl = (offer: Offer) => {
-    if (offer.Image) {
-      // L'image est stockée en BLOB dans la base de données
-      // Le backend la sert via cet endpoint
-      return `${API_BASE_URL}/api/offers/${offer.Id_devis}/image`;
+  // Fonction pour obtenir l'URL de l'image (si disponible)
+  const getImageUrl = (demande: Demande) => {
+    if (demande.first_photo_id) {
+      return `${API_BASE_URL}/api/demandes/${demande.id}/photos/${demande.first_photo_id}`;
     }
     return null;
   };
@@ -327,23 +311,23 @@ export function ParticulierDashboard() {
                       onChange={handleInputChange}
                       className="w-full pl-3 pr-10 py-3 text-base border border-fixup-blue/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-fixup-orange focus:border-fixup-orange"
                     >
-                      <option value="exterieur">Extérieur</option>
-                      <option value="informatique">Informatique</option>
-                      <option value="electronique">Électronique</option>
-                      <option value="bois">Bois</option>
+                      <option value="Produits électroniques">Produits électroniques</option>
+                      <option value="Gros électroménager">Gros électroménager</option>
+                      <option value="Petit électroménager">Petit électroménager</option>
                     </select>
                   </div>
 
                   <div>
-                    <label htmlFor="prix" className="block text-sm font-medium text-fixup-black mb-2">
-                      Budget estimé (€)
+                    <label htmlFor="titre" className="block text-sm font-medium text-fixup-black mb-2">
+                      Titre de la demande
                     </label>
                     <input
-                      type="number"
-                      id="prix"
-                      name="prix"
-                      value={formData.prix}
+                      type="text"
+                      id="titre"
+                      name="titre"
+                      value={formData.titre}
                       onChange={handleInputChange}
+                      placeholder="Ex: Réparation d'un ordinateur"
                       className="w-full border border-fixup-blue/20 rounded-lg py-3 px-3 focus:outline-none focus:ring-2 focus:ring-fixup-orange focus:border-fixup-orange"
                       required
                     />
@@ -414,36 +398,20 @@ export function ParticulierDashboard() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="adresse_facturation" className="block text-sm font-medium text-fixup-black mb-2">
-                      Adresse
-                    </label>
-                    <input
-                      type="text"
-                      id="adresse_facturation"
-                      name="adresse_facturation"
-                      value={formData.adresse_facturation}
-                      onChange={handleInputChange}
-                      className="w-full border border-fixup-blue/20 rounded-lg py-3 px-3 focus:outline-none focus:ring-2 focus:ring-fixup-orange focus:border-fixup-orange"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="Code_postal" className="block text-sm font-medium text-fixup-black mb-2">
-                      Code postal
-                    </label>
-                    <input
-                      type="text"
-                      id="Code_postal"
-                      name="Code_postal"
-                      value={formData.Code_postal}
-                      onChange={handleInputChange}
-                      className="w-full border border-fixup-blue/20 rounded-lg py-3 px-3 focus:outline-none focus:ring-2 focus:ring-fixup-orange focus:border-fixup-orange"
-                      required
-                    />
-                  </div>
+                <div>
+                  <label htmlFor="adresse" className="block text-sm font-medium text-fixup-black mb-2">
+                    Adresse d'intervention (ou Code Postal)
+                  </label>
+                  <input
+                    type="text"
+                    id="adresse"
+                    name="adresse"
+                    value={formData.adresse}
+                    onChange={handleInputChange}
+                    placeholder="Ex: 49000 Angers ou 12 rue de la Paix"
+                    className="w-full border border-fixup-blue/20 rounded-lg py-3 px-3 focus:outline-none focus:ring-2 focus:ring-fixup-orange focus:border-fixup-orange"
+                    required
+                  />
                 </div>
 
                 <div className="flex justify-center pt-6">
@@ -468,9 +436,15 @@ export function ParticulierDashboard() {
             <div className="bg-white rounded-xl shadow-lg p-8 border border-fixup-blue/20">
               <h2 className="text-3xl font-bold text-fixup-black mb-8 text-center">Mes demandes de réparation</h2>
 
+              {error && (
+                <div className="mb-6 p-4 text-sm text-red-700 bg-red-100 rounded-lg shadow-sm text-center">
+                  {error}
+                </div>
+              )}
+
               {loading ? (
                 <LoadingSpinner message="Chargement des demandes..." />
-              ) : offers.length === 0 ? (
+              ) : demandes.length === 0 ? (
                 <div className="text-center py-12">
                   <FileText className="w-16 h-16 text-fixup-blue/50 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-fixup-black mb-2">Aucune demande pour le moment</h3>
@@ -484,55 +458,45 @@ export function ParticulierDashboard() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {offers.map((offer) => {
-                    const imageUrl = getImageUrl(offer);
+                  {demandes.map((demande) => {
+                    const imageUrl = getImageUrl(demande);
                     return (
-                      <div key={offer.Id_devis} className="bg-fixup-white rounded-xl shadow-lg overflow-hidden border border-fixup-blue/20 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                      <div key={demande.id} className="bg-fixup-white rounded-xl shadow-lg overflow-hidden border border-fixup-blue/20 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
                         <div className="h-48 bg-cover bg-center relative" style={{
-                          backgroundImage: `url(${imageUrl || getCategoryImage(offer.type_reparation || 'exterieur')})`
+                          backgroundImage: `url(${imageUrl || getCategoryImage(demande.type_reparation || 'exterieur')})`
                         }}>
-                          <div className="absolute top-0 right-0 mt-3 mr-3">
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-fixup-green/90 text-white shadow-sm">
-                              {offer.prix ? `${offer.prix}€` : 'Prix non défini'}
-                            </span>
-                          </div>
                         </div>
 
                         <div className="p-6">
                           <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-xl font-semibold text-fixup-black">
-                              {getCategoryName(offer.type_reparation || 'exterieur')}
+                            <h3 className="text-xl font-semibold text-fixup-black line-clamp-1">
+                              {demande.titre || getCategoryName(demande.type_reparation || 'exterieur')}
                             </h3>
-                            <div className="text-right">
-                              <div className="flex items-center text-sm text-fixup-black/70 mb-1">
-                                <User className="w-4 h-4 mr-1" />
-                                <span>{getUserDisplayName(offer)}</span>
-                              </div>
-                              <div className="text-lg font-bold text-fixup-green">
-                                {offer.prix && offer.prix !== '0' ? `${offer.prix}€` : 'Prix non défini'}
-                              </div>
-                            </div>
                           </div>
 
                           <p className="text-base text-fixup-black/70 mb-4 line-clamp-2">
-                            {offer.description || 'Aucune description'}
+                            {demande.description || 'Aucune description'}
                           </p>
 
-                          <div className="flex items-center justify-between text-sm text-fixup-black mb-3">
+                          <div className="flex flex-col text-sm text-fixup-black mb-3 space-y-1">
                             <div className="flex items-center">
                               <MapPin className="w-4 h-4 mr-2" />
-                              <span>{offer.Code_postal || 'Code postal non spécifié'}</span>
+                              <span className="truncate">{demande.adresse || 'Adresse non spécifiée'}</span>
                             </div>
                             <div className="flex items-center">
                               <Calendar className="w-4 h-4 mr-2" />
-                              <span>{new Date(offer.Date).toLocaleDateString('fr-FR')}</span>
+                              <span>{new Date(demande.date_creation).toLocaleDateString('fr-FR')}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <User className="w-4 h-4 mr-2" />
+                              <span>{getArtisanDisplayName(demande)}</span>
                             </div>
                           </div>
 
-                          {offer.status && (
-                            <div className="flex justify-center">
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(offer.status)}`}>
-                                {offer.status}
+                          {demande.status && (
+                            <div className="flex justify-center mt-4">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(demande.status)}`}>
+                                {demande.status}
                               </span>
                             </div>
                           )}

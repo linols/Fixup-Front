@@ -1,176 +1,254 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
-import { RepairType } from '../types/offer';
-import { useOffers } from '../hooks/useOffers';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-
-interface Offer {
-  Id_devis: number;
-  description: string;
-  Date: string;
-  Id_user: number;
-  type_reparation?: RepairType;
-  prix?: string;
-  adresse_facturation?: string;
-  Code_postal?: string;
-  nom_utilisateur?: string;
-  status?: 'en_attente' | 'pris_en_charge' | 'terminé';
-}
+import { fetchDemandes, fetchArtisanDemandes, updateDemandeStatus } from '../services/api';
+import type { Demande } from '../types/types';
+import { FileText, MapPin, Calendar, Check, X, User } from 'lucide-react';
 
 export function ProfessionalDashboard() {
-  const [success, setSuccess] = useState('');
-  const [submitError, setSubmitError] = useState('');
+  const [activeTab, setActiveTab] = useState<'publiques' | 'ciblees'>('publiques');
+  const [demandes, setDemandes] = useState<Demande[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
   const userId = localStorage.getItem('userId');
+  const navigate = useNavigate();
 
-  // Utiliser le hook personnalisé avec cache
-  const { offers, loading, error, refresh } = useOffers({
-    cacheKey: 'professional_offers',
-    cacheExpiration: 5 * 60 * 1000, // 5 minutes
-    autoFetch: true
-  });
-
-  const handleTakeCharge = async (offerId: number) => {
+  const loadDemandes = useCallback(async () => {
+    if (!userId) return;
+    setLoading(true);
+    setError('');
     try {
-      const response = await fetch(`${API_BASE_URL}/api/offers/${offerId}/take-charge`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          professionalId: userId
-        })
-      });
-
-      if (response.ok) {
-        setSuccess('Vous avez pris en charge cette demande avec succès !');
-        // Recharger les offres pour mettre à jour leur statut (forcer le rafraîchissement)
-        refresh();
+      if (activeTab === 'publiques') {
+        // Here we could filter by 'en attente' using backend params if implemented,
+        // but for now we fetch and filter in frontend to be safe.
+        const allDemandes = await fetchDemandes();
+        // Public demands: no id_artisan, and status 'en_attente'
+        const publicDemandes = allDemandes.filter(d => !d.id_artisan && d.status === 'en_attente');
+        setDemandes(publicDemandes);
       } else {
-        setSubmitError('Une erreur est survenue lors de la prise en charge de la demande');
+        // Demandes ciblées vers cet artisan (inclut en attente, accepte, termine, refuse)
+        const artisanDemandes = await fetchArtisanDemandes(userId);
+        setDemandes(artisanDemandes);
       }
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du chargement des demandes');
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, activeTab]);
+
+  useEffect(() => {
+    loadDemandes();
+  }, [loadDemandes]);
+
+  const handleUpdateStatus = async (demandeId: number, status: 'acceptee' | 'refusee' | 'terminee') => {
+    try {
+      await updateDemandeStatus(demandeId, {
+        status,
+        id_artisan_assigne: status === 'acceptee' ? parseInt(userId!) : undefined
+      });
+      setSuccessMsg(`Demande ${status} avec succès`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+      loadDemandes();
     } catch (err) {
-      setSubmitError('Erreur de connexion au serveur');
-      console.error(err);
+      setError('Erreur lors de la mise à jour du statut');
+      setTimeout(() => setError(''), 3000);
+    }
+  };
+
+  const getCategoryImage = (type: string) => {
+    const images = {
+      'exterieur': '/images/categories/exterieur.jpg',
+      'informatique': '/images/categories/informatique.jpg',
+      'electronique': '/images/categories/electronique.jpg',
+      'bois': '/images/categories/bois.jpg'
+    };
+    return images[type as keyof typeof images] || '/images/categories/exterieur.jpg';
+  };
+
+  const getImageUrl = (demande: Demande) => {
+    if (demande.first_photo_id) {
+      return `${API_BASE_URL}/api/demandes/${demande.id}/photos/${demande.first_photo_id}`;
+    }
+    return null;
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'en_attente':
+      case 'en attente':
+        return 'bg-fixup-orange/10 text-fixup-orange border border-fixup-orange/20';
+      case 'acceptee':
+      case 'acceptée':
+        return 'bg-fixup-green/10 text-fixup-green border border-fixup-green/20';
+      case 'refusee':
+      case 'refusée':
+        return 'bg-red-100 text-red-700 border border-red-200';
+      case 'terminee':
+      case 'terminée':
+        return 'bg-blue-100 text-blue-700 border border-blue-200';
+      default:
+        return 'bg-gray-100 text-gray-700 border border-gray-200';
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-fixup-white to-fixup-blue/10 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-4xl font-bold text-fixup-black mb-8 text-center">Demandes de réparation disponibles</h1>
 
-        {loading && <LoadingSpinner message="Chargement des demandes..." />}
+        {/* Header Actions */}
+        <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
+          <h1 className="text-4xl font-bold text-fixup-black text-center sm:text-left">
+            Espace Artisan
+          </h1>
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate('/messagerie')}
+              className="px-4 py-2 bg-fixup-blue text-white font-medium rounded-lg hover:bg-fixup-blue/90 transition-colors"
+            >
+              Messages
+            </button>
+            <button
+              onClick={() => navigate('/edit-profil-artisan')}
+              className="px-4 py-2 bg-fixup-orange text-white font-medium rounded-lg hover:bg-fixup-orange/90 transition-colors"
+            >
+              Voir mon profil d'artisan
+            </button>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="flex justify-center mb-8">
+          <div className="bg-white rounded-xl shadow-lg p-2 border border-fixup-blue/20 inline-flex">
+            <button
+              onClick={() => setActiveTab('publiques')}
+              className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${activeTab === 'publiques'
+                ? 'bg-fixup-blue text-white shadow-md'
+                : 'text-fixup-black hover:bg-fixup-blue/10'
+                }`}
+            >
+              <FileText className="w-4 h-4" />
+              Demandes Publiques
+            </button>
+            <button
+              onClick={() => setActiveTab('ciblees')}
+              className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${activeTab === 'ciblees'
+                ? 'bg-fixup-blue text-white shadow-md'
+                : 'text-fixup-black hover:bg-fixup-blue/10'
+                }`}
+            >
+              <User className="w-4 h-4" />
+              Mes Demandes Ciblées
+            </button>
+          </div>
+        </div>
+
+        {/* Notifications */}
         {error && (
           <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg shadow-sm">
             {error}
           </div>
         )}
-        {submitError && (
-          <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg shadow-sm">
-            {submitError}
-          </div>
-        )}
-        {success && (
+        {successMsg && (
           <div className="mb-4 p-4 text-sm text-fixup-green bg-fixup-green/10 rounded-lg shadow-sm">
-            {success}
+            {successMsg}
           </div>
         )}
 
-        {!loading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {offers.map((offer) => (
-            <div key={offer.Id_devis} className="bg-white rounded-xl shadow-lg overflow-hidden border border-fixup-blue/20">
-              {/* Image de la catégorie */}
-              <div className="h-48 bg-fixup-white relative">
-                {offer.type_reparation === 'exterieur' && (
-                  <img 
-                    src="/images/categories/exterieur.jpg" 
-                    alt="Travaux extérieurs"
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                {offer.type_reparation === 'informatique' && (
-                  <img 
-                    src="/images/categories/informatique.jpg"
-                    alt="Réparation informatique"
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                {offer.type_reparation === 'electronique' && (
-                  <img 
-                    src="/images/categories/electronique.jpg"
-                    alt="Réparation électronique"
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                {offer.type_reparation === 'bois' && (
-                  <img 
-                    src="/images/categories/bois.jpg"
-                    alt="Travaux bois"
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                <div className="absolute top-0 right-0 mt-3 mr-3">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-fixup-green/10 text-fixup-green shadow-sm">
-                    {offer.prix ? `${offer.prix}€` : 'Prix non défini'}
-                  </span>
-                </div>
-              </div>
+        {/* List of Demandes */}
+        {loading ? (
+          <LoadingSpinner message="Chargement des demandes..." />
+        ) : demandes.length === 0 ? (
+          <div className="text-center text-fixup-black/70 py-12 bg-white rounded-xl shadow-sm border border-fixup-blue/20">
+            {activeTab === 'publiques'
+              ? 'Aucune demande publique disponible pour le moment.'
+              : 'Aucune demande ciblée ne vous a été adressée.'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {demandes.map((demande) => {
+              const imageUrl = getImageUrl(demande) || getCategoryImage(demande.type_reparation || 'exterieur');
+              return (
+                <div key={demande.id} className="bg-white rounded-xl shadow-lg overflow-hidden border border-fixup-blue/20 flex flex-col">
+                  {/* Image */}
+                  <div className="h-48 bg-cover bg-center relative" style={{ backgroundImage: `url(${imageUrl})` }}>
+                    <div className="absolute top-3 right-3">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium shadow-sm ${getStatusBadge(demande.status)}`}>
+                        {demande.status}
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Contenu */}
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xl font-semibold text-fixup-black">
-                    {offer.type_reparation ? 
-                      offer.type_reparation.charAt(0).toUpperCase() + offer.type_reparation.slice(1)
-                      : 'Type non spécifié'
-                    }
-                  </h3>
-                  <span className="text-sm text-fixup-black/70">
-                    Par {offer.nom_utilisateur}
-                  </span>
+                  {/* Content */}
+                  <div className="p-6 flex-1 flex flex-col">
+                    <div className="mb-3">
+                      <h3 className="text-xl font-semibold text-fixup-black line-clamp-1">
+                        {demande.titre || demande.type_reparation}
+                      </h3>
+                      {demande.Prenom && (
+                        <span className="text-sm text-fixup-black/70">
+                          Par {demande.Prenom} {demande.Nom}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-base text-fixup-black/70 mb-4 line-clamp-3 flex-1">
+                      {demande.description || 'Aucune description'}
+                    </p>
+
+                    <div className="flex flex-col gap-2 text-sm text-fixup-black mb-6">
+                      <div className="flex items-center">
+                        <MapPin className="h-4 w-4 mr-2" />
+                        <span className="truncate">{demande.adresse || 'Non spécifiée'}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        <span>{new Date(demande.date_creation).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    {demande.status === 'en_attente' && (
+                      <div className="flex gap-2 mt-auto">
+                        <button
+                          onClick={() => handleUpdateStatus(demande.id, 'acceptee')}
+                          className="flex-1 flex items-center justify-center py-2 px-4 rounded-lg text-sm font-medium text-white bg-fixup-green hover:bg-fixup-green/90 transition-colors"
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          Accepter
+                        </button>
+                        {activeTab === 'ciblees' && (
+                          <button
+                            onClick={() => handleUpdateStatus(demande.id, 'refusee')}
+                            className="flex-1 flex items-center justify-center py-2 px-4 rounded-lg text-sm font-medium text-fixup-black bg-gray-100 hover:bg-gray-200 transition-colors border border-gray-300"
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Refuser
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {demande.status === 'acceptee' && (
+                      <div className="flex gap-2 mt-auto">
+                        <button
+                          onClick={() => handleUpdateStatus(demande.id, 'terminee')}
+                          className="flex-1 flex items-center justify-center py-2 px-4 rounded-lg text-sm font-medium text-white bg-fixup-blue hover:bg-blue-600 transition-colors"
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          Marquer Terminé
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <p className="text-base text-fixup-black/70 mb-4">
-                  {offer.description || 'Aucune description'}
-                </p>
-                <div className="flex items-center justify-between text-sm text-fixup-black mb-4">
-                  <div className="flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span>{offer.Code_postal || 'Code postal non spécifié'}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>{new Date(offer.Date).toLocaleDateString('fr-FR')}</span>
-                  </div>
-                </div>
-                {offer.status === 'en_attente' ? (
-                  <button
-                    onClick={() => handleTakeCharge(offer.Id_devis)}
-                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-fixup-blue hover:bg-fixup-blue/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-fixup-blue transition-colors duration-200"
-                  >
-                    Prendre en charge
-                  </button>
-                ) : (
-                  <div className="text-center py-2 text-sm text-fixup-green">
-                    Demande déjà prise en charge
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-          {offers.length === 0 && (
-            <div className="col-span-full text-center text-fixup-blue py-12 bg-white rounded-xl shadow-sm border border-fixup-blue/20">
-              Aucune demande de réparation disponible
-            </div>
-          )}
-        </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
   );
-} 
+}

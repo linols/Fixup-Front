@@ -1,29 +1,61 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config/api';
+
+interface LatestOffer {
+  Id_devis: number;
+  description: string;
+  Date: string;
+  Code_postal?: string;
+  adresse_facturation?: string;
+  type_reparation?: string;
+  prix?: string;
+  Prenom?: string;
+  Nom?: string;
+}
+
+const getCategoryImage = (type?: string) => {
+  const images: Record<string, string> = {
+    'exterieur': 'https://images.unsplash.com/photo-1581141849291-1125c7b692b5?auto=format&fit=crop&q=80&w=500&h=300',
+    'informatique': 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=500&h=300',
+    'electronique': 'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?auto=format&fit=crop&q=80&w=500&h=300',
+    'bois': 'https://images.unsplash.com/photo-1621905251918-48416bd8575a?auto=format&fit=crop&q=80&w=500&h=300',
+  };
+  return images[type || ''] || 'https://images.unsplash.com/photo-1581141849291-1125c7b692b5?auto=format&fit=crop&q=80&w=500&h=300';
+};
+
+const getCategoryTitle = (type?: string) => {
+  const names: Record<string, string> = {
+    'exterieur': 'Travaux extérieurs',
+    'informatique': 'Réparation informatique',
+    'electronique': 'Réparation électronique',
+    'bois': 'Travaux bois',
+  };
+  return names[type || ''] || 'Demande de réparation';
+};
 
 export function LatestRequests() {
-  const requests = [
-    {
-      id: 1,
-      image: "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?auto=format&fit=crop&q=80&w=500&h=300",
-      title: "Rénovation salle de bain",
-      location: "Paris 11e",
-      date: "Il y a 2 jours"
-    },
-    {
-      id: 2,
-      image: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&q=80&w=500&h=300",
-      title: "Installation cuisine",
-      location: "Lyon 3e",
-      date: "Il y a 3 jours"
-    },
-    {
-      id: 3,
-      image: "https://images.unsplash.com/photo-1621905251918-48416bd8575a?auto=format&fit=crop&q=80&w=500&h=300",
-      title: "Peinture salon",
-      location: "Marseille 8e",
-      date: "Il y a 4 jours"
-    }
-  ];
+  const [requests, setRequests] = useState<LatestOffer[]>([]);
+
+  useEffect(() => {
+    const loadRequests = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/offers`);
+        if (res.ok) {
+          const data = await res.json();
+          // Prendre les 3 dernières offres
+          setRequests(data.slice(0, 3));
+        }
+      } catch (err) {
+        console.error('Erreur chargement dernières demandes:', err);
+      }
+    };
+    loadRequests();
+  }, []);
+
+  // Fallback si pas de données
+  if (requests.length === 0) {
+    return null;
+  }
 
   return (
     <div className="relative bg-white">
@@ -43,19 +75,22 @@ export function LatestRequests() {
 
         <div className="grid md:grid-cols-3 gap-8 mb-12">
           {requests.map((request) => (
-            <div key={request.id} className="bg-white rounded-lg shadow-lg overflow-hidden transform hover:-translate-y-1 transition-transform duration-300">
+            <div key={request.Id_devis} className="bg-white rounded-lg shadow-lg overflow-hidden transform hover:-translate-y-1 transition-transform duration-300">
               <div className="relative h-48">
-                <img 
-                  src={request.image} 
-                  alt={request.title}
+                <img
+                  src={getCategoryImage(request.type_reparation)}
+                  alt={getCategoryTitle(request.type_reparation)}
                   className="w-full h-full object-cover"
                 />
               </div>
               <div className="p-6">
-                <h3 className="text-xl font-semibold text-fixup-black mb-2">{request.title}</h3>
+                <h3 className="text-xl font-semibold text-fixup-black mb-2">
+                  {getCategoryTitle(request.type_reparation)}
+                </h3>
+                <p className="text-sm text-gray-600 mb-2 line-clamp-2">{request.description}</p>
                 <div className="flex justify-between text-sm text-gray-600">
-                  <span>{request.location}</span>
-                  <span>{request.date}</span>
+                  <span>{request.Code_postal || request.adresse_facturation || ''}</span>
+                  <span>{new Date(request.Date).toLocaleDateString('fr-FR')}</span>
                 </div>
               </div>
             </div>

@@ -19,22 +19,29 @@ import { ParticulierDashboard } from './pages/ParticulierDashboard';
 import { ProfessionalDashboard } from './pages/ProfessionalDashboard';
 import { TrouverArtisan } from './pages/TrouverArtisan';
 import { ProfilArtisan } from './pages/ProfilArtisan';
+import { EditProfilArtisan } from './pages/EditProfilArtisan';
+import { Messagerie } from './pages/Messagerie';
+import { LegalPage } from './pages/LegalPage';
 
 const avatars: Record<string, string> = { '1': avatar1, '2': avatar2, '3': avatar3, '4': avatar4 };
 
 // Composant pour l'accès refusé
-function AccessDenied() {
+function AccessDenied({ role }: { role: 'professionnel' | 'particulier' }) {
+  const isForPro = role === 'professionnel';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-fixup-white to-fixup-blue/10 pt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-fixup-black mb-4">Accès refusé</h1>
-          <p className="text-xl text-fixup-black/70 mb-8">Cette page est réservée aux professionnels</p>
+          <p className="text-xl text-fixup-black/70 mb-8">
+            {isForPro ? "Cette page est réservée aux professionnels" : "Cette page est réservée aux particuliers"}
+          </p>
           <Link
-            to="/"
+            to={isForPro ? "/dashboard" : "/professional-dashboard"}
             className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-fixup-blue hover:bg-fixup-blue/90 transition-colors duration-200"
           >
-            Retour à l'accueil
+            Retour à mon espace
           </Link>
         </div>
       </div>
@@ -43,7 +50,15 @@ function AccessDenied() {
 }
 
 // Composant de protection des routes
-function PrivateRoute({ children, requiresProfessional = false }: { children: React.ReactNode, requiresProfessional?: boolean }) {
+function PrivateRoute({
+  children,
+  requiresProfessional = false,
+  requiresParticulier = false
+}: {
+  children: React.ReactNode,
+  requiresProfessional?: boolean,
+  requiresParticulier?: boolean
+}) {
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
   const userRole = localStorage.getItem('userRole');
   const navigate = useNavigate();
@@ -62,7 +77,16 @@ function PrivateRoute({ children, requiresProfessional = false }: { children: Re
     return (
       <>
         <Navigation />
-        <AccessDenied />
+        <AccessDenied role="professionnel" />
+      </>
+    );
+  }
+
+  if (requiresParticulier && userRole !== 'particulier') {
+    return (
+      <>
+        <Navigation />
+        <AccessDenied role="particulier" />
       </>
     );
   }
@@ -150,7 +174,6 @@ function NavLink({ icon, text, colorIndex, onClick }: { icon: React.ReactNode; t
 function Navigation() {
   const navigate = useNavigate();
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-  const userRole = localStorage.getItem('userRole');
   const avatarIndex = localStorage.getItem('userAvatar') ?? '1';
   const userAvatarSrc = avatars[avatarIndex] ?? avatar1;
 
@@ -174,6 +197,19 @@ function Navigation() {
       navigate('/professional-dashboard');
     } else {
       navigate('/login');
+    }
+  };
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      // On n'est pas sur la page d'accueil : on y navigue puis on scrolle
+      navigate('/');
+      setTimeout(() => {
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
     }
   };
 
@@ -201,12 +237,21 @@ function Navigation() {
                 colorIndex={1}
                 onClick={handleParticulierClick}
               />
-              <NavLink icon={<HelpCircle className="w-4 h-4" />} text="Comment ça marche ?" colorIndex={2} />
-              <NavLink icon={<MessageCircle className="w-4 h-4" />} text="Avis" colorIndex={0} />
+              <NavLink icon={<HelpCircle className="w-4 h-4" />} text="Comment ça marche ?" colorIndex={2} onClick={() => scrollToSection('comment-ca-marche')} />
+              <NavLink icon={<MessageCircle className="w-4 h-4" />} text="Avis" colorIndex={0} onClick={() => scrollToSection('avis')} />
             </div>
 
             {/* Connexion/Déconnexion aligné à droite */}
-            <div className="ml-8">
+            <div className="ml-8 flex items-center gap-3">
+              {isAuthenticated && (
+                <button
+                  onClick={() => navigate('/messagerie')}
+                  className="relative p-2 rounded-full hover:bg-fixup-blue/10 transition-colors"
+                  title="Messages"
+                >
+                  <MessageCircle className="w-5 h-5 text-fixup-black" />
+                </button>
+              )}
               {isAuthenticated ? (
                 <button
                   onClick={handleLogout}
@@ -244,13 +289,23 @@ export function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={
-            <PrivateRoute>
+            <PrivateRoute requiresParticulier={true}>
               <ParticulierDashboard />
             </PrivateRoute>
           } />
           <Route path="/professional-dashboard" element={
             <PrivateRoute requiresProfessional={true}>
               <ProfessionalDashboard />
+            </PrivateRoute>
+          } />
+          <Route path="/edit-profil-artisan" element={
+            <PrivateRoute requiresProfessional={true}>
+              <EditProfilArtisan />
+            </PrivateRoute>
+          } />
+          <Route path="/messagerie" element={
+            <PrivateRoute>
+              <Messagerie />
             </PrivateRoute>
           } />
           <Route
@@ -268,6 +323,56 @@ export function App() {
               <>
                 <Navigation />
                 <ProfilArtisan />
+              </>
+            }
+          />
+          <Route
+            path="/cgu"
+            element={
+              <>
+                <Navigation />
+                <LegalPage />
+                <Footer />
+              </>
+            }
+          />
+          <Route
+            path="/cgv"
+            element={
+              <>
+                <Navigation />
+                <LegalPage />
+                <Footer />
+              </>
+            }
+          />
+          <Route
+            path="/politique-confidentialite"
+            element={
+              <>
+                <Navigation />
+                <LegalPage />
+                <Footer />
+              </>
+            }
+          />
+          <Route
+            path="/mentions-legales"
+            element={
+              <>
+                <Navigation />
+                <LegalPage />
+                <Footer />
+              </>
+            }
+          />
+          <Route
+            path="/cookies"
+            element={
+              <>
+                <Navigation />
+                <LegalPage />
+                <Footer />
               </>
             }
           />

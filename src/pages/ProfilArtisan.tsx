@@ -1,8 +1,24 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Star, Heart, Flag, X, Camera } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Star, Heart, Flag, X, MessageCircle } from 'lucide-react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
+import {
+    fetchArtisan,
+    fetchArtisanCategories,
+    fetchArtisanAvis,
+    fetchArtisanAvisStats,
+    fetchArtisanPhotos,
+    getPhotoUrl,
+    postDemande,
+    getProfilePhotoUrl,
+    getArtisanCoverPhotoUrl,
+    fetchArtisanCoverPhotoMetadata
+} from '../services/api';
+import type { ArtisanProfile, ArtisanCategory, Avis, AvisStats, ArtisanPhoto } from '../types/types';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+
+import handShake from '../assets/hand-shake.png';
 
 // Fix default marker icon (Leaflet + webpack/vite issue)
 const defaultIcon = L.icon({
@@ -14,213 +30,180 @@ const defaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = defaultIcon;
 
-// ─── Mock Data ───────────────────────────────────────────────────────────────
-
-interface ArtisanProfile {
-    id: number;
-    name: string;
-    title: string;
-    city: string;
-    onlineStatus: string;
-    registeredSince: string;
-    rating: number;
-    reviewCount: number;
-    misesEnRelation: number;
-    bio: string;
-    disponibilites: { jour: string; horaire: string }[];
-    categories: {
-        mainCategory: string;
-        subcategory: string;
-        items: string[];
-    }[];
-}
-
-interface Review {
-    id: number;
-    author: string;
-    date: string;
-    rating: number;
-    category: string;
-    mainCategory: string;
-    text: string;
-    artisanResponse?: string;
-}
-
-const MOCK_PROFILE: ArtisanProfile = {
-    id: 1,
-    name: 'Joseph G.',
-    title: 'Technicien',
-    city: 'Angers (Croix Blanche)',
-    onlineStatus: 'En ligne il y a 2 heures',
-    registeredSince: '23 décembre 2025',
-    rating: 4.9,
-    reviewCount: 68,
-    misesEnRelation: 184,
-    bio: `« Bonjour,
-Homme de 48 ans aimant bricolage, cuisine et jardinage, disponible en complément de mon travail le soir et le week-end. Je peux réparer beaucoup d'appareils électroniques différents et quelques gros électroménagers.
-Mon tarif est 15 euros de l'heure pour 1 travail en journée continue, la première intervention est elle à 25 euros. »`,
-    disponibilites: [
-        { jour: 'Lundi', horaire: 'Disponible 24h/24' },
-        { jour: 'Mardi', horaire: '17h00 – 22h00' },
-        { jour: 'Mercredi', horaire: 'Pas disponible' },
-        { jour: 'Jeudi', horaire: '17h00 – 22h00' },
-        { jour: 'Vendredi', horaire: '18h00 – 21h00' },
-        { jour: 'Samedi', horaire: 'Disponible 24h/24' },
-        { jour: 'Dimanche', horaire: 'Disponible 24h/24' },
-    ],
-    categories: [
-        {
-            mainCategory: 'Produits électroniques',
-            subcategory: 'Informatique et Bureautique',
-            items: ['PC portable', 'Unités centrales', 'Tablettes', 'Ecrans de PC'],
-        },
-        {
-            mainCategory: 'Produits électroniques',
-            subcategory: 'Téléphonie et objets connectés',
-            items: ['Smartphones', 'Montres connectées'],
-        },
-        {
-            mainCategory: 'Produits électroniques',
-            subcategory: 'Audio et son',
-            items: ['Téléviseurs'],
-        },
-        {
-            mainCategory: 'Produits électroniques',
-            subcategory: 'Loisirs',
-            items: ['Consoles de jeux', 'Appareils photo'],
-        },
-        {
-            mainCategory: 'Gros électroménagers',
-            subcategory: 'Appareils de lavage',
-            items: ['Lave-vaisselles'],
-        },
-        {
-            mainCategory: 'Gros électroménagers',
-            subcategory: 'Appareils de cuisson',
-            items: ['Micro-ondes posables', 'Micro-ondes encastrés'],
-        },
-        {
-            mainCategory: 'Petits électroménagers',
-            subcategory: 'Cuisine',
-            items: ['Machines à café (capsules)', 'Grille-pains'],
-        },
-    ],
-};
-
-const MOCK_REVIEWS: Review[] = [
-    {
-        id: 1,
-        author: 'Scott J.',
-        date: '7 février 2026',
-        rating: 5,
-        category: 'Informatique et Bureautique',
-        mainCategory: 'Produits électroniques',
-        text: 'Travail soigné, efficace et une bonne communication. Je recommande.',
-        artisanResponse: 'Merci beaucoup Scott :)',
-    },
-    {
-        id: 2,
-        author: 'Marine P.',
-        date: '12 décembre 2025',
-        rating: 1,
-        category: 'Appareils de lavage',
-        mainCategory: 'Gros électroménagers',
-        text: 'beaucoup trop cher',
-        artisanResponse: 'Madame on viens à peine de discuter pour les tarifs vous étiez d\'accord et là vous me mettez un mauvais avis...',
-    },
-    {
-        id: 3,
-        author: 'Thomas L.',
-        date: '28 novembre 2025',
-        rating: 5,
-        category: 'Téléphonie et objets connectés',
-        mainCategory: 'Produits électroniques',
-        text: 'Réparation rapide de mon smartphone, écran changé en 30 minutes. Excellent service !',
-    },
-    {
-        id: 4,
-        author: 'Claire D.',
-        date: '15 novembre 2025',
-        rating: 4,
-        category: 'Cuisine',
-        mainCategory: 'Petits électroménagers',
-        text: 'Machine à café réparée correctement. Un peu long pour avoir un rdv mais bon travail.',
-        artisanResponse: 'Merci Claire, désolé pour l\'attente, je fais de mon mieux !',
-    },
-    {
-        id: 5,
-        author: 'Paul R.',
-        date: '2 novembre 2025',
-        rating: 5,
-        category: 'Loisirs',
-        mainCategory: 'Produits électroniques',
-        text: 'Console PS5 réparée nickel. Merci Joseph !',
-    },
-];
-
 // ─── Helper: color per main category ─────────────────────────────────────────
 
 const getCategoryColor = (mainCat: string) => {
-    switch (mainCat) {
-        case 'Produits électroniques':
-            return 'bg-fixup-green text-white';
-        case 'Gros électroménagers':
-            return 'bg-fixup-orange text-white';
-        case 'Petits électroménagers':
-            return 'bg-fixup-blue text-white';
-        default:
-            return 'bg-gray-200 text-fixup-black';
-    }
+    const lc = mainCat.toLowerCase();
+    if (lc.includes('électronique') || lc.includes('electronique')) return 'bg-fixup-green text-white';
+    if (lc.includes('gros')) return 'bg-fixup-orange text-white';
+    if (lc.includes('petit')) return 'bg-fixup-blue text-white';
+    return 'bg-gray-200 text-fixup-black';
 };
 
 const getCategoryTagColor = (mainCat: string) => {
-    switch (mainCat) {
-        case 'Produits électroniques':
-            return 'text-fixup-green';
-        case 'Gros électroménagers':
-            return 'text-fixup-orange';
-        case 'Petits électroménagers':
-            return 'text-fixup-blue';
-        default:
-            return 'text-gray-500';
-    }
+    const lc = mainCat.toLowerCase();
+    if (lc.includes('électronique') || lc.includes('electronique')) return 'text-fixup-green';
+    if (lc.includes('gros')) return 'text-fixup-orange';
+    if (lc.includes('petit')) return 'text-fixup-blue';
+    return 'text-gray-500';
 };
 
-// ─── Avatar Icons ────────────────────────────────────────────────────────────
+// ─── Avatar Icons (pp-anonyme) ───────────────────────────────────────────────
 
-const AVATAR_ICONS = [
-    '/avatars/avatar-1.svg',
-    '/avatars/avatar-2.svg',
-    '/avatars/avatar-3.svg',
-    '/avatars/avatar-4.svg',
-];
+import ppAvatar1 from '../assets/pp-anonymes_Fixaly-01.png';
+import ppAvatar2 from '../assets/pp-anonymes_Fixaly-02.png';
+import ppAvatar3 from '../assets/pp-anonymes_Fixaly-03.png';
+import ppAvatar4 from '../assets/pp-anonymes_Fixaly-04.png';
 
-const getAvatar = (id: number) => AVATAR_ICONS[id % AVATAR_ICONS.length];
+const AVATARS = [ppAvatar1, ppAvatar2, ppAvatar3, ppAvatar4];
+const getAvatar = (id: number) => AVATARS[id % AVATARS.length];
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function ProfilArtisan() {
     const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
     const artisanId = parseInt(id || '1');
-    const profile = MOCK_PROFILE; // In real app: fetch by artisanId
 
+    // Data states
+    const [profile, setProfile] = useState<ArtisanProfile | null>(null);
+    const [categories, setCategories] = useState<ArtisanCategory[]>([]);
+    const [reviews, setReviews] = useState<Avis[]>([]);
+    const [avisStats, setAvisStats] = useState<AvisStats | null>(null);
+    const [photos, setPhotos] = useState<ArtisanPhoto[]>([]);
+    const [hasCoverPhoto, setHasCoverPhoto] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    // UI states
     const [activeTab, setActiveTab] = useState<'presentation' | 'avis' | 'photos'>('presentation');
     const [showVoirTout, setShowVoirTout] = useState(false);
     const [showFiltre, setShowFiltre] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
     const [showDemande, setShowDemande] = useState(false);
+    const [demandeTitre, setDemandeTitre] = useState('');
     const [demandeDescription, setDemandeDescription] = useState('');
+    const [demandeTypeReparation, setDemandeTypeReparation] = useState('Produits électroniques');
     const [demandeAdresse, setDemandeAdresse] = useState('');
+    const [demandePhotos, setDemandePhotos] = useState<File[]>([]);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const [demandeSending, setDemandeSending] = useState(false);
+    const [demandeSuccess, setDemandeSuccess] = useState('');
+    const [demandeError, setDemandeError] = useState('');
 
     // Filter state for reviews
     const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
     const [allCategoriesChecked, setAllCategoriesChecked] = useState(true);
 
+    // ── Fetch data ────────────────────────────────────────────────────────────
+
+    useEffect(() => {
+        const loadData = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const [profileData, categoriesData, reviewsData, statsData, photosData, coverMeta] =
+                    await Promise.allSettled([
+                        fetchArtisan(artisanId),
+                        fetchArtisanCategories(artisanId),
+                        fetchArtisanAvis(artisanId, { limit: 50 }),
+                        fetchArtisanAvisStats(artisanId),
+                        fetchArtisanPhotos(artisanId),
+                        fetchArtisanCoverPhotoMetadata(artisanId),
+                    ]);
+
+                if (profileData.status === 'fulfilled') setProfile(profileData.value);
+                else throw new Error('Profil introuvable');
+
+                if (categoriesData.status === 'fulfilled') setCategories(categoriesData.value);
+                if (reviewsData.status === 'fulfilled') setReviews(reviewsData.value);
+                if (statsData.status === 'fulfilled') setAvisStats(statsData.value);
+                if (photosData.status === 'fulfilled') setPhotos(photosData.value);
+                if (coverMeta.status === 'fulfilled') setHasCoverPhoto(coverMeta.value.hasPhotoProfilArtisan);
+            } catch (err: any) {
+                console.error('Erreur chargement profil artisan:', err);
+                setError(err.message || 'Impossible de charger ce profil');
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadData();
+    }, [artisanId]);
+
+    // ── Send demand / message ─────────────────────────────────────────────────
+
+    const handleSendDemande = async () => {
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+            navigate('/login');
+            return;
+        }
+        setDemandeSending(true);
+        setDemandeError('');
+        try {
+            const formData = new FormData();
+            formData.append('id_user', userId);
+            formData.append('id_artisan', artisanId.toString());
+            formData.append('titre', demandeTitre);
+            formData.append('description', demandeDescription);
+            formData.append('type_reparation', demandeTypeReparation);
+            formData.append('adresse', demandeAdresse);
+
+            demandePhotos.forEach(file => {
+                formData.append('photos', file);
+            });
+
+            await postDemande(formData);
+
+            setDemandeSuccess('Votre demande a été envoyée avec succès !');
+            setDemandeTitre('');
+            setDemandeDescription('');
+            setDemandeAdresse('');
+            setDemandeTypeReparation('Plomberie');
+            setDemandePhotos([]);
+            setImagePreviews([]);
+
+            setTimeout(() => {
+                setShowDemande(false);
+                setDemandeSuccess('');
+            }, 2000);
+        } catch (err) {
+            console.error('Erreur envoi demande:', err);
+            setDemandeError('Impossible d\'envoyer la demande. Veuillez réessayer.');
+        } finally {
+            setDemandeSending(false);
+        }
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            setDemandePhotos(prev => [...prev, ...files]);
+
+            const previews: string[] = [];
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    if (e.target?.result) {
+                        previews.push(e.target.result as string);
+                        if (previews.length === files.length) {
+                            setImagePreviews(prev => [...prev, ...previews]);
+                        }
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+    };
+
+    // ── Derived data ──────────────────────────────────────────────────────────
+
     // Get unique categories that have reviews
-    const reviewCategories = MOCK_REVIEWS.reduce<{ mainCategory: string; subcategory: string }[]>(
+    const reviewCategories = reviews.reduce<{ mainCategory: string; subcategory: string }[]>(
         (acc, r) => {
-            if (!acc.find((c) => c.subcategory === r.category)) {
-                acc.push({ mainCategory: r.mainCategory, subcategory: r.category });
+            const cat = r.categorie || 'Autre';
+            if (!acc.find((c) => c.subcategory === cat)) {
+                acc.push({ mainCategory: cat, subcategory: cat });
             }
             return acc;
         },
@@ -228,24 +211,23 @@ export function ProfilArtisan() {
     );
 
     // Group review categories by main category
-    const groupedReviewCategories = reviewCategories.reduce<
-        Record<string, string[]>
-    >((acc, c) => {
+    const groupedReviewCategories = reviewCategories.reduce<Record<string, string[]>>((acc, c) => {
         if (!acc[c.mainCategory]) acc[c.mainCategory] = [];
-        acc[c.mainCategory].push(c.subcategory);
+        if (!acc[c.mainCategory].includes(c.subcategory)) acc[c.mainCategory].push(c.subcategory);
         return acc;
     }, {});
 
     // Filtered reviews
     const filteredReviews =
         allCategoriesChecked || selectedFilters.length === 0
-            ? MOCK_REVIEWS
-            : MOCK_REVIEWS.filter((r) => selectedFilters.includes(r.category));
+            ? reviews
+            : reviews.filter((r) => selectedFilters.includes(r.categorie || 'Autre'));
 
     // Rating distribution
     const ratingDistribution = [5, 4, 3, 2, 1].map((stars) => {
-        const count = MOCK_REVIEWS.filter((r) => r.rating === stars).length;
-        const pct = MOCK_REVIEWS.length > 0 ? Math.round((count / MOCK_REVIEWS.length) * 100) : 0;
+        const count = avisStats?.distribution?.[stars] || reviews.filter((r) => r.note === stars).length;
+        const total = avisStats?.nombre_total || reviews.length;
+        const pct = total > 0 ? Math.round((count / total) * 100) : 0;
         return { stars, count, pct };
     });
 
@@ -265,16 +247,47 @@ export function ProfilArtisan() {
     };
 
     // Get first few items for sidebar display
-    const sidebarItems = profile.categories.flatMap((c) => c.items).slice(0, 7);
+    const sidebarItems = categories.flatMap((c) => c.items).slice(0, 7);
 
     // Group all categories by main category for "Voir tout"
-    const groupedCategories = profile.categories.reduce<
+    const groupedCategories = categories.reduce<
         Record<string, { subcategory: string; items: string[] }[]>
     >((acc, c) => {
         if (!acc[c.mainCategory]) acc[c.mainCategory] = [];
         acc[c.mainCategory].push({ subcategory: c.subcategory, items: c.items });
         return acc;
     }, {});
+
+    // Profile display values
+    const displayName = profile ? `${profile.Prenom} ${profile.Nom?.charAt(0)}.` : '';
+    const displayRating = avisStats?.note_moyenne ?? profile?.note_moyenne ?? 0;
+    const displayReviewCount = avisStats?.nombre_total ?? profile?.nombre_avis ?? 0;
+
+    // ── Loading / Error states ────────────────────────────────────────────────
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-fixup-white pt-20 flex items-center justify-center">
+                <LoadingSpinner message="Chargement du profil..." />
+            </div>
+        );
+    }
+
+    if (error || !profile) {
+        return (
+            <div className="min-h-screen bg-fixup-white pt-20">
+                <div className="max-w-5xl mx-auto px-4 py-10 text-center">
+                    <p className="text-red-500 text-lg mb-4">{error || 'Profil introuvable'}</p>
+                    <button
+                        onClick={() => navigate('/trouver-artisan')}
+                        className="px-6 py-2 bg-fixup-blue text-white rounded-lg"
+                    >
+                        Retour à la recherche
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     // ── Render: Star rating row ──────────────────────────────────────────────
 
@@ -297,21 +310,19 @@ export function ProfilArtisan() {
     const renderHeader = () => (
         <div className="relative mb-0">
             {/* Cover photo */}
-            <div className="h-48 bg-gray-300 rounded-t-2xl relative">
+            <div className="h-48 bg-gray-300 rounded-t-2xl relative overflow-hidden">
+                {hasCoverPhoto ? (
+                    <img src={getArtisanCoverPhotoUrl(artisanId)} alt="Couverture" className="w-full h-full object-cover" />
+                ) : (
+                    <p className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">photo</p>
+                )}
+                {/* Favorite button */}
                 <button
                     onClick={() => setIsFavorite(!isFavorite)}
-                    className="absolute top-4 left-4 w-10 h-10 bg-white/80 rounded-full flex items-center justify-center hover:bg-white transition-colors"
+                    className="absolute top-4 left-4 w-10 h-10 bg-white/80 rounded-full flex items-center justify-center hover:bg-white transition-colors z-10"
                 >
-                    <Heart
-                        className={`w-5 h-5 ${isFavorite
-                            ? 'text-red-500 fill-red-500'
-                            : 'text-fixup-orange'
-                            }`}
-                    />
+                    <Heart className={`w-5 h-5 ${isFavorite ? 'text-red-500 fill-red-500' : 'text-fixup-orange'}`} />
                 </button>
-                <p className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
-                    photo
-                </p>
 
                 {/* Rating badge */}
                 <button
@@ -320,10 +331,10 @@ export function ProfilArtisan() {
                 >
                     <Star className="w-4 h-4 text-fixup-orange fill-fixup-orange" />
                     <span className="text-sm font-bold text-fixup-black">
-                        {profile.rating}/5
+                        {displayRating.toFixed(1)}/5
                     </span>
                     <span className="text-xs text-fixup-black/50">
-                        ({profile.reviewCount} avis)
+                        ({displayReviewCount} avis)
                     </span>
                 </button>
             </div>
@@ -334,32 +345,47 @@ export function ProfilArtisan() {
                 <div className="absolute -top-12 left-8">
                     <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-fixup-orange/10 flex items-center justify-center overflow-hidden">
                         <img
-                            src={getAvatar(artisanId)}
-                            alt={profile.name}
+                            src={getProfilePhotoUrl(artisanId)}
+                            alt={displayName}
                             className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).src = getAvatar(artisanId); }}
                         />
                     </div>
                 </div>
 
                 <div className="flex items-start justify-between pt-14">
                     <div>
-                        <h1 className="text-2xl font-bold text-fixup-black">
-                            {profile.name}
-                        </h1>
-                        <p className="text-sm text-fixup-black/70">{profile.title}</p>
-                        <p className="text-sm text-fixup-black/50">{profile.city}</p>
-                        <p className="text-xs text-fixup-black/40">{profile.onlineStatus}</p>
+                        <h1 className="text-2xl font-bold text-fixup-black">{displayName}</h1>
+                        <p className="text-sm text-fixup-black/70">{profile.poste || profile.Domaine_activite || ''}</p>
+                        <p className="text-sm text-fixup-black/50">
+                            {profile.Adresse || profile.Code_postal || ''}
+                        </p>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                        <span className="text-xs text-fixup-black/50">
-                            Inscrit depuis le {profile.registeredSince}
-                        </span>
-                        <button
-                            onClick={() => setShowDemande(true)}
-                            className="px-6 py-2.5 border-2 border-fixup-black text-fixup-black font-medium rounded-lg hover:bg-fixup-green hover:border-fixup-green hover:text-white transition-all duration-200"
-                        >
-                            Faire une demande
-                        </button>
+                        {profile.date_inscription && (
+                            <span className="text-xs text-fixup-black/50">
+                                Inscrit depuis le {new Date(profile.date_inscription).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </span>
+                        )}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    const userId = localStorage.getItem('userId');
+                                    if (!userId) { navigate('/login'); return; }
+                                    navigate(`/messagerie?contact=${artisanId}`);
+                                }}
+                                className="px-4 py-2.5 border-2 border-fixup-blue text-fixup-blue font-medium rounded-lg hover:bg-fixup-blue hover:text-white transition-all duration-200 flex items-center gap-2"
+                            >
+                                <MessageCircle className="w-4 h-4" />
+                                Contacter
+                            </button>
+                            <button
+                                onClick={() => setShowDemande(true)}
+                                className="px-6 py-2.5 border-2 border-fixup-black text-fixup-black font-medium rounded-lg hover:bg-fixup-green hover:border-fixup-green hover:text-white transition-all duration-200"
+                            >
+                                Faire une demande
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -394,94 +420,109 @@ export function ProfilArtisan() {
     // ── Render: Sidebar (Présentation) ───────────────────────────────────────
 
     const renderPresentationSidebar = () => (
-        <div className="space-y-6">
+        <div className="space-y-6 flex flex-col items-center">
             {/* Mises en relation */}
-            <div className="flex items-center gap-3">
-                <div className="text-2xl">📡</div>
-                <div>
-                    <p className="text-2xl font-bold text-fixup-black">
-                        {profile.misesEnRelation}
+            <div className="flex flex-col items-center text-center">
+                <div className="flex items-center gap-3">
+                    <img src={handShake} alt="Mises en relation" className="w-10 h-10 object-contain" />
+                    <p className="text-[32px] font-bold text-fixup-black">
+                        {profile.nombre_mises_en_relation ?? 0}
                     </p>
-                    <p className="text-sm text-fixup-black/60">mises en relations</p>
                 </div>
+                <p className="text-xl font-medium text-fixup-black mt-1">mises en relations</p>
             </div>
+
+            <div className="w-full h-px bg-gray-200 mt-6 mb-6"></div>
 
             {/* Category tags */}
-            <div>
-                <p className="text-sm font-semibold text-fixup-black mb-3">
-                    Répond aux demandes de
-                </p>
-                <div className="flex flex-wrap gap-2">
-                    {sidebarItems.map((item) => (
-                        <span
-                            key={item}
-                            className="px-3 py-1 bg-gray-100 rounded-full text-xs text-fixup-black border border-gray-200"
-                        >
-                            {item}
-                        </span>
-                    ))}
+            {sidebarItems.length > 0 && (
+                <div className="flex flex-col items-center text-center w-full">
+                    <p className="text-xl font-semibold text-fixup-black mb-6">
+                        Répond aux demandes de
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                        {sidebarItems.map((item) => (
+                            <span
+                                key={item}
+                                className="px-4 py-2 bg-[#DDF1FF] rounded-lg text-[15px] font-medium text-fixup-black"
+                            >
+                                {item}
+                            </span>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => setShowVoirTout(true)}
+                        className="mt-6 px-8 py-2.5 border-2 border-fixup-green text-fixup-black text-[17px] font-bold rounded-xl hover:bg-fixup-green/10 transition-colors bg-white shadow-sm"
+                    >
+                        Voir tout
+                    </button>
                 </div>
-                <button
-                    onClick={() => setShowVoirTout(true)}
-                    className="mt-3 px-4 py-1.5 border-2 border-fixup-green text-fixup-black text-sm font-medium rounded-full hover:bg-fixup-green/10 transition-colors"
-                >
-                    Voir tout
-                </button>
-            </div>
+            )}
 
             {/* Signaler */}
-            <button className="flex items-center gap-2 text-sm text-fixup-black/40 hover:text-fixup-black/60 transition-colors">
-                <Flag className="w-4 h-4" />
-                Signaler ce profil
-            </button>
+            <div className="bg-white rounded-xl shadow-sm mt-8 border border-gray-100 w-full p-4 flex justify-center">
+                <button className="flex items-center gap-2 text-[17px] font-medium text-gray-400 hover:text-gray-600 transition-colors">
+                    <Flag className="w-5 h-5" />
+                    Signaler ce profil
+                </button>
+            </div>
         </div>
     );
 
-    // ── Render: Content (Présentation) ───────────────────────────────────────
+    // ── Parse daily availability ──────────────────────────────────────────────
+
+    const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+    type DayAvailability = { disponible: boolean; horaire: string };
+    type WeekSchedule = Record<string, DayAvailability>;
+
+    const defaultSchedule: WeekSchedule = DAYS.reduce((acc, day) => {
+        acc[day] = { disponible: true, horaire: 'Disponible 24h/24' };
+        return acc;
+    }, {} as WeekSchedule);
+
+    let weekSchedule: WeekSchedule = defaultSchedule;
+    if (profile.statut_disponibilite) {
+        try {
+            const parsed = typeof profile.statut_disponibilite === 'string'
+                ? JSON.parse(profile.statut_disponibilite)
+                : profile.statut_disponibilite;
+            if (typeof parsed === 'object' && !Array.isArray(parsed) && parsed.Lundi !== undefined) {
+                weekSchedule = parsed;
+            }
+        } catch { /* keep default */ }
+    }
 
     const renderPresentationContent = () => (
         <div className="space-y-8">
             {/* Bio */}
             <div className="bg-gray-50 rounded-xl p-6">
                 <p className="text-sm text-fixup-black whitespace-pre-line leading-relaxed">
-                    {profile.bio}
+                    {profile.description ? `« ${profile.description} »` : <span className="text-fixup-black/40 italic">Aucune description renseignée.</span>}
                 </p>
             </div>
 
             {/* Disponibilités */}
             <div>
                 <h3 className="text-lg font-bold text-fixup-black mb-4">Disponibilités</h3>
-                <div className="space-y-2">
-                    {profile.disponibilites.map((d) => (
-                        <div key={d.jour} className="flex items-center text-sm">
-                            <span className="w-28 font-medium text-fixup-black">
-                                {d.jour} :
-                            </span>
-                            <span
-                                className={`${d.horaire === 'Pas disponible'
-                                    ? 'text-fixup-black/40'
-                                    : 'text-fixup-black/70'
-                                    }`}
-                            >
-                                {d.horaire}
-                            </span>
-                        </div>
-                    ))}
+                <div className="space-y-1">
+                    {DAYS.map(day => {
+                        const avail = weekSchedule[day] || { disponible: false, horaire: 'Pas disponible' };
+                        return (
+                            <div key={day} className="flex items-center gap-4 py-1.5">
+                                <span className="w-24 text-sm font-medium text-fixup-black">{day} :</span>
+                                <span className={`text-sm ${avail.disponible ? 'text-fixup-black/70' : 'text-red-400'}`}>
+                                    {avail.horaire || (avail.disponible ? 'Disponible 24h/24' : 'Pas disponible')}
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
             {/* Map */}
             <div className="h-56 rounded-xl overflow-hidden relative z-0">
-                <MapContainer
-                    center={[47.4784, -0.5632]}
-                    zoom={13}
-                    scrollWheelZoom={false}
-                    style={{ height: '100%', width: '100%' }}
-                >
-                    <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
+                <MapContainer center={[47.4784, -0.5632]} zoom={13} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
+                    <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                     <Marker position={[47.4784, -0.5632]} />
                 </MapContainer>
             </div>
@@ -497,11 +538,11 @@ export function ProfilArtisan() {
                 <div className="flex items-center justify-center gap-2 mb-1">
                     <Star className="w-6 h-6 text-fixup-orange fill-fixup-orange" />
                     <span className="text-3xl font-bold text-fixup-black">
-                        {profile.rating}/5
+                        {displayRating.toFixed(1)}/5
                     </span>
                 </div>
                 <p className="text-sm text-fixup-black/50">
-                    basé sur {profile.reviewCount} avis
+                    basé sur {displayReviewCount} avis
                 </p>
             </div>
 
@@ -550,63 +591,65 @@ export function ProfilArtisan() {
 
     const renderAvisContent = () => (
         <div className="space-y-6">
-            {filteredReviews.map((review) => (
-                <div
-                    key={review.id}
-                    className="border-b border-gray-100 pb-6 last:border-0"
-                >
-                    {/* Review header */}
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-fixup-green/20 flex items-center justify-center">
-                                <span className="text-sm font-bold text-fixup-green">
-                                    {review.author.charAt(0)}
-                                </span>
-                            </div>
-                            <div>
-                                <p className="font-bold text-sm text-fixup-black">
-                                    {review.author}
-                                </p>
-                                <p className="text-xs text-fixup-black/40">
-                                    posté le {review.date}
-                                </p>
-                            </div>
-                        </div>
-                        {renderStars(review.rating)}
-                    </div>
-
-                    {/* Category tag */}
-                    <p
-                        className={`text-xs font-medium mb-2 ${getCategoryTagColor(
-                            review.mainCategory
-                        )}`}
+            {filteredReviews.length === 0 ? (
+                <p className="text-center text-fixup-black/50 py-8">Aucun avis pour le moment.</p>
+            ) : (
+                filteredReviews.map((review) => (
+                    <div
+                        key={review.id}
+                        className="border-b border-gray-100 pb-6 last:border-0"
                     >
-                        {review.mainCategory}
-                    </p>
-
-                    {/* Review text */}
-                    <p className="text-sm text-fixup-black/80 mb-3">{review.text}</p>
-
-                    {/* Artisan response */}
-                    {review.artisanResponse && (
-                        <div className="ml-8 pl-4 border-l-2 border-fixup-orange/30">
-                            <div className="flex items-center gap-2 mb-1">
-                                <div className="w-6 h-6 rounded-full bg-fixup-orange/20 flex items-center justify-center">
-                                    <span className="text-xs font-bold text-fixup-orange">
-                                        {profile.name.charAt(0)}
+                        {/* Review header */}
+                        <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-fixup-green/20 flex items-center justify-center">
+                                    <span className="text-sm font-bold text-fixup-green">
+                                        {(review.Prenom || '?').charAt(0)}
                                     </span>
                                 </div>
-                                <p className="font-bold text-sm text-fixup-black">
-                                    {profile.name}
+                                <div>
+                                    <p className="font-bold text-sm text-fixup-black">
+                                        {review.Prenom} {review.Nom?.charAt(0)}.
+                                    </p>
+                                    <p className="text-xs text-fixup-black/40">
+                                        posté le {new Date(review.date_creation).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </p>
+                                </div>
+                            </div>
+                            {renderStars(review.note)}
+                        </div>
+
+                        {/* Category tag */}
+                        {review.categorie && (
+                            <p className={`text-xs font-medium mb-2 ${getCategoryTagColor(review.categorie)}`}>
+                                {review.categorie}
+                            </p>
+                        )}
+
+                        {/* Review text */}
+                        <p className="text-sm text-fixup-black/80 mb-3">{review.commentaire}</p>
+
+                        {/* Artisan responses */}
+                        {review.reponses && review.reponses.length > 0 && review.reponses.map((rep) => (
+                            <div key={rep.id} className="ml-8 pl-4 border-l-2 border-fixup-orange/30">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="w-6 h-6 rounded-full bg-fixup-orange/20 flex items-center justify-center">
+                                        <span className="text-xs font-bold text-fixup-orange">
+                                            {(rep.Prenom || displayName).charAt(0)}
+                                        </span>
+                                    </div>
+                                    <p className="font-bold text-sm text-fixup-black">
+                                        {rep.Prenom} {rep.Nom?.charAt(0)}.
+                                    </p>
+                                </div>
+                                <p className="text-sm text-fixup-black/70">
+                                    {rep.commentaire}
                                 </p>
                             </div>
-                            <p className="text-sm text-fixup-black/70">
-                                {review.artisanResponse}
-                            </p>
-                        </div>
-                    )}
-                </div>
-            ))}
+                        ))}
+                    </div>
+                ))
+            )}
         </div>
     );
 
@@ -614,16 +657,24 @@ export function ProfilArtisan() {
 
     const renderPhotosContent = () => (
         <div className="py-8">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div
-                        key={i}
-                        className="aspect-square bg-gray-100 rounded-xl flex items-center justify-center"
-                    >
-                        <p className="text-sm text-gray-400 italic">Photo {i}</p>
-                    </div>
-                ))}
-            </div>
+            {photos.length === 0 ? (
+                <p className="text-center text-fixup-black/50 py-8">Aucune photo pour le moment.</p>
+            ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {photos.map((photo) => (
+                        <div
+                            key={photo.id}
+                            className="aspect-square bg-gray-100 rounded-xl overflow-hidden"
+                        >
+                            <img
+                                src={getPhotoUrl(photo.id)}
+                                alt={photo.name || `Photo ${photo.id}`}
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 
@@ -655,15 +706,11 @@ export function ProfilArtisan() {
                     <div className="overflow-y-auto p-6 space-y-6">
                         {Object.entries(groupedCategories).map(([mainCat, subs]) => (
                             <div key={mainCat}>
-                                {/* Main category badge */}
                                 <span
-                                    className={`inline-block px-3 py-1 rounded-full text-sm font-semibold mb-3 ${getCategoryColor(
-                                        mainCat
-                                    )}`}
+                                    className={`inline-block px-3 py-1 rounded-full text-sm font-semibold mb-3 ${getCategoryColor(mainCat)}`}
                                 >
                                     {mainCat} :
                                 </span>
-
                                 {subs.map((sub) => (
                                     <div key={sub.subcategory} className="mb-4 ml-1">
                                         <p className="text-sm font-medium text-fixup-black mb-2">
@@ -683,6 +730,9 @@ export function ProfilArtisan() {
                                 ))}
                             </div>
                         ))}
+                        {Object.keys(groupedCategories).length === 0 && (
+                            <p className="text-center text-fixup-black/50">Aucune catégorie renseignée.</p>
+                        )}
                     </div>
                 </div>
             </div>
@@ -700,12 +750,11 @@ export function ProfilArtisan() {
                     onClick={() => setShowFiltre(false)}
                 />
                 <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 max-h-[80vh] flex flex-col">
-                    {/* Header */}
                     <div className="flex items-center justify-between p-6 border-b border-gray-100">
                         <div>
                             <h2 className="text-lg font-bold text-fixup-black">Filtres</h2>
                             <p className="text-xs text-fixup-black/50 mt-1">
-                                Comprend uniquement les catégories ayant reçues un avis sur une prestation
+                                Comprend uniquement les catégories ayant reçues un avis
                             </p>
                         </div>
                         <button
@@ -716,9 +765,7 @@ export function ProfilArtisan() {
                         </button>
                     </div>
 
-                    {/* Scrollable content */}
                     <div className="overflow-y-auto p-6 space-y-4">
-                        {/* All categories */}
                         <label className="flex items-center gap-3 cursor-pointer">
                             <input
                                 type="checkbox"
@@ -734,9 +781,7 @@ export function ProfilArtisan() {
                         {Object.entries(groupedReviewCategories).map(([mainCat, subs]) => (
                             <div key={mainCat}>
                                 <span
-                                    className={`inline-block px-3 py-1 rounded-full text-sm font-semibold mb-2 ${getCategoryColor(
-                                        mainCat
-                                    )}`}
+                                    className={`inline-block px-3 py-1 rounded-full text-sm font-semibold mb-2 ${getCategoryColor(mainCat)}`}
                                 >
                                     {mainCat} :
                                 </span>
@@ -747,10 +792,7 @@ export function ProfilArtisan() {
                                     >
                                         <input
                                             type="checkbox"
-                                            checked={
-                                                allCategoriesChecked ||
-                                                selectedFilters.includes(sub)
-                                            }
+                                            checked={allCategoriesChecked || selectedFilters.includes(sub)}
                                             onChange={() => toggleFilter(sub)}
                                             className="w-4 h-4 accent-fixup-green"
                                         />
@@ -761,7 +803,6 @@ export function ProfilArtisan() {
                         ))}
                     </div>
 
-                    {/* Footer */}
                     <div className="p-6 border-t border-gray-100">
                         <button
                             onClick={() => setShowFiltre(false)}
@@ -786,7 +827,6 @@ export function ProfilArtisan() {
                     onClick={() => setShowDemande(false)}
                 />
                 <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
-                    {/* Header */}
                     <div className="flex items-center justify-between p-6 border-b border-gray-100">
                         <h2 className="text-lg font-bold text-fixup-black">
                             Faire une demande
@@ -799,9 +839,46 @@ export function ProfilArtisan() {
                         </button>
                     </div>
 
-                    {/* Content */}
                     <div className="overflow-y-auto p-6 space-y-6">
-                        {/* Description */}
+                        {demandeSuccess && (
+                            <div className="p-3 bg-fixup-green/10 text-fixup-green rounded-lg text-sm font-medium">
+                                {demandeSuccess}
+                            </div>
+                        )}
+                        {demandeError && (
+                            <div className="p-3 bg-red-100 text-red-700 rounded-lg text-sm font-medium">
+                                {demandeError}
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="block text-sm font-medium text-fixup-black mb-2">
+                                Titre de la demande
+                            </label>
+                            <input
+                                type="text"
+                                value={demandeTitre}
+                                onChange={(e) => setDemandeTitre(e.target.value)}
+                                placeholder="Ex: Réparation chauffe-eau"
+                                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-fixup-black focus:outline-none focus:border-fixup-orange focus:ring-1 focus:ring-fixup-orange"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-fixup-black mb-2">
+                                Type de réparation
+                            </label>
+                            <select
+                                value={demandeTypeReparation}
+                                onChange={(e) => setDemandeTypeReparation(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-fixup-black focus:outline-none focus:border-fixup-orange focus:ring-1 focus:ring-fixup-orange"
+                            >
+                                <option value="Produits électroniques">Produits électroniques</option>
+                                <option value="Gros électroménager">Gros électroménager</option>
+                                <option value="Petit électroménager">Petit électroménager</option>
+                            </select>
+                        </div>
+
                         <div>
                             <label className="block text-sm font-medium text-fixup-black mb-2">
                                 Décrivez votre besoin
@@ -809,53 +886,80 @@ export function ProfilArtisan() {
                             <textarea
                                 value={demandeDescription}
                                 onChange={(e) => setDemandeDescription(e.target.value)}
-                                placeholder="Bonjour,"
+                                placeholder="Détaillez le problème..."
                                 rows={4}
                                 className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-fixup-black placeholder:text-fixup-black/30 focus:outline-none focus:border-fixup-orange focus:ring-1 focus:ring-fixup-orange resize-none"
                             />
                         </div>
 
-                        {/* Photos */}
                         <div>
                             <label className="block text-sm font-medium text-fixup-black mb-1">
-                                Ajoutez des photos
+                                Ajoutez des photos (optionnel)
                             </label>
                             <p className="text-xs text-fixup-black/50 mb-3">
                                 Cela aidera l'artisan à mieux se projeter sur votre demande
                             </p>
-                            <div className="flex gap-3">
-                                {[1, 2, 3].map((i) => (
-                                    <button
-                                        key={i}
-                                        className="w-20 h-20 border-2 border-gray-200 rounded-xl flex items-center justify-center hover:border-fixup-orange/50 hover:bg-fixup-orange/5 transition-colors"
-                                    >
-                                        <Camera className="w-6 h-6 text-fixup-black/30" />
-                                    </button>
-                                ))}
-                            </div>
+                            <input
+                                type="file"
+                                id="photos-upload"
+                                name="photos"
+                                multiple
+                                accept="image/*"
+                                onChange={handleFileChange}
+                                className="w-full text-sm text-fixup-black file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-fixup-orange/10 file:text-fixup-orange hover:file:bg-fixup-orange/20 cursor-pointer mb-2"
+                            />
+
+                            {/* Previews */}
+                            {imagePreviews.length > 0 && (
+                                <div className="grid grid-cols-3 gap-3 mt-3">
+                                    {imagePreviews.map((preview, index) => (
+                                        <div key={index} className="relative group">
+                                            <img
+                                                src={preview}
+                                                alt={`Aperçu ${index + 1}`}
+                                                className="w-full h-20 object-cover rounded-lg border border-gray-200"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const newPreviews = [...imagePreviews];
+                                                    newPreviews.splice(index, 1);
+                                                    setImagePreviews(newPreviews);
+                                                    const newPhotos = [...demandePhotos];
+                                                    newPhotos.splice(index, 1);
+                                                    setDemandePhotos(newPhotos);
+                                                }}
+                                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
-                        {/* Adresse */}
                         <div>
                             <label className="block text-sm font-medium text-fixup-black mb-2">
-                                Adresse
+                                Adresse d'intervention
                             </label>
                             <input
                                 type="text"
                                 value={demandeAdresse}
                                 onChange={(e) => setDemandeAdresse(e.target.value)}
+                                placeholder="Code postal, ville ou adresse complète"
                                 className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-fixup-black placeholder:text-fixup-black/30 focus:outline-none focus:border-fixup-orange focus:ring-1 focus:ring-fixup-orange"
                             />
                         </div>
                     </div>
 
-                    {/* Footer */}
                     <div className="p-6 border-t border-gray-100">
                         <button
-                            onClick={() => setShowDemande(false)}
-                            className="w-full py-2.5 bg-fixup-orange text-white text-sm font-medium rounded-full hover:bg-fixup-green transition-all duration-200"
+                            onClick={handleSendDemande}
+                            disabled={demandeSending || !demandeDescription}
+                            className="w-full py-2.5 bg-fixup-orange text-white text-sm font-medium rounded-full hover:bg-fixup-green transition-all duration-200 disabled:opacity-50"
                         >
-                            Envoyer la demande
+                            {demandeSending ? 'Envoi en cours...' : 'Envoyer la demande'}
                         </button>
                     </div>
                 </div>
@@ -864,9 +968,6 @@ export function ProfilArtisan() {
     };
 
     // ── Main render ──────────────────────────────────────────────────────────
-
-    // Suppress unused variable warning for artisanId used in avatar
-    void artisanId;
 
     return (
         <div className="min-h-screen bg-fixup-white pt-20">

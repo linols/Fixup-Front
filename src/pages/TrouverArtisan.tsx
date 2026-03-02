@@ -1,8 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, MapPin, Star } from 'lucide-react';
+import { fetchArtisans } from '../services/api';
+import { getProfilePhotoUrl } from '../services/api';
+import type { Artisan } from '../types/types';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
-// ─── Category Data ───────────────────────────────────────────────────────────
+// ─── Category Data (for search autocomplete, unchanged) ─────────────────────
 
 interface CategoryItem {
     name: string;
@@ -12,81 +16,50 @@ interface CategoryItem {
 
 const CATEGORIES: CategoryItem[] = [
     // PRODUITS ÉLECTRONIQUES
-    // Informatique et Bureautique
     { name: 'Ordinateurs (PC portables, unités centrales, écrans)', subcategory: 'Informatique et Bureautique', mainCategory: 'Produits électroniques' },
     { name: 'Périphériques (écrans de PC, imprimantes, onduleurs, souris)', subcategory: 'Informatique et Bureautique', mainCategory: 'Produits électroniques' },
-    // Téléphones et Objets Connectés
     { name: 'Smartphones', subcategory: 'Téléphones et Objets Connectés', mainCategory: 'Produits électroniques' },
     { name: 'Montres connectées', subcategory: 'Téléphones et Objets Connectés', mainCategory: 'Produits électroniques' },
-    // Image et Son
     { name: 'Télévisions', subcategory: 'Image et Son', mainCategory: 'Produits électroniques' },
     { name: 'Audio (enceintes Bluetooth, casques audio, appareils audio Hi-Fi)', subcategory: 'Image et Son', mainCategory: 'Produits électroniques' },
     { name: 'Photo (appareils de tous et appareils photo)', subcategory: 'Image et Son', mainCategory: 'Produits électroniques' },
-
     // GROS ÉLECTROMÉNAGER
-    // Appareils de lavage
     { name: 'Lave-linge', subcategory: 'Appareils de lavage', mainCategory: 'Gros électroménager' },
     { name: 'Sèche-linge (à condensation ou pompe à chaleur)', subcategory: 'Appareils de lavage', mainCategory: 'Gros électroménager' },
     { name: 'Lave-vaisselle', subcategory: 'Appareils de lavage', mainCategory: 'Gros électroménager' },
-    // Appareils de cuisson
     { name: 'Fours encastrables et cuisinières', subcategory: 'Appareils de cuisson', mainCategory: 'Gros électroménager' },
     { name: 'Plaques de cuisson (induction, vitrocéramique, gaz)', subcategory: 'Appareils de cuisson', mainCategory: 'Gros électroménager' },
     { name: 'Micro-ondes (posables ou encastrés)', subcategory: 'Appareils de cuisson', mainCategory: 'Gros électroménager' },
     { name: 'Hottes aspirantes', subcategory: 'Appareils de cuisson', mainCategory: 'Gros électroménager' },
-    // Appareils de froid
     { name: 'Réfrigérateurs (une porte, combinés, américains)', subcategory: 'Appareils de froid', mainCategory: 'Gros électroménager' },
     { name: 'Congélateurs (armoires ou coffres)', subcategory: 'Appareils de froid', mainCategory: 'Gros électroménager' },
     { name: 'Caves à vin', subcategory: 'Appareils de froid', mainCategory: 'Gros électroménager' },
-
     // PETITS ÉLECTROMÉNAGERS
-    // Maison
     { name: 'Aspirateur de maison', subcategory: 'Maison', mainCategory: 'Petit électroménager' },
     { name: 'Aspirateur à main', subcategory: 'Maison', mainCategory: 'Petit électroménager' },
     { name: 'Aspirateur robot', subcategory: 'Maison', mainCategory: 'Petit électroménager' },
     { name: 'Nettoyeurs vapeur et fers à repasser', subcategory: 'Maison', mainCategory: 'Petit électroménager' },
-    // Cuisine
     { name: 'Robots pâtissiers et multifonctions', subcategory: 'Cuisine', mainCategory: 'Petit électroménager' },
     { name: 'Blenders, mixeurs plongeants et centrifugeuses', subcategory: 'Cuisine', mainCategory: 'Petit électroménager' },
     { name: 'Friteuses et machines à pain', subcategory: 'Cuisine', mainCategory: 'Petit électroménager' },
     { name: 'Machines à café (capsules, grain, filtre)', subcategory: 'Cuisine', mainCategory: 'Petit électroménager' },
     { name: 'Bouilloires et grille-pains', subcategory: 'Cuisine', mainCategory: 'Petit électroménager' },
-    // Salle de bain
     { name: 'Sèche-cheveux, lisseurs/boucleurs', subcategory: 'Salle de bain', mainCategory: 'Petit électroménager' },
     { name: 'Tondeuses et épilateurs', subcategory: 'Salle de bain', mainCategory: 'Petit électroménager' },
-    // Jardinage (from screenshot: aspirateur broyeur souffleur)
     { name: 'Aspirateur broyeur souffleur', subcategory: 'Jardinage', mainCategory: 'Gros électroménager' },
     { name: 'Aspirateur de bassin', subcategory: 'Piscines', mainCategory: 'Gros électroménager' },
     { name: 'Aspirateur à eau et poussières', subcategory: 'Travaux', mainCategory: 'Gros électroménager' },
 ];
 
-// ─── Mock Artisan Data ───────────────────────────────────────────────────────
+// ─── Avatar Icons (pp-anonyme) ───────────────────────────────────────────────
 
-interface MockArtisan {
-    id: number;
-    name: string;
-    city: string;
-    rating: number;
-    reviews: number;
-    onlineSince: string;
-    avatar: string;
-}
+import ppAvatar1 from '../assets/pp-anonymes_Fixaly-01.png';
+import ppAvatar2 from '../assets/pp-anonymes_Fixaly-02.png';
+import ppAvatar3 from '../assets/pp-anonymes_Fixaly-03.png';
+import ppAvatar4 from '../assets/pp-anonymes_Fixaly-04.png';
 
-const MOCK_ARTISANS: MockArtisan[] = [
-    { id: 1, name: 'Laurent H.', city: 'Angers (Adeline)', rating: 4.8, reviews: 28, onlineSince: 'En ligne il y a 24 minutes', avatar: '' },
-    { id: 2, name: 'Olivier P.', city: 'Notre-Dame-les-Angers (La Venerie)', rating: 3.7, reviews: 3, onlineSince: 'En ligne il y a 48 minutes', avatar: '' },
-    { id: 3, name: 'Amine M.', city: 'Angers (Capucins)', rating: 4.8, reviews: 186, onlineSince: 'En ligne à l\'instant', avatar: '' },
-];
-
-// ─── Avatar Icons ────────────────────────────────────────────────────────────
-
-const AVATAR_ICONS = [
-    '/avatars/avatar-1.svg',
-    '/avatars/avatar-2.svg',
-    '/avatars/avatar-3.svg',
-    '/avatars/avatar-4.svg',
-];
-
-const getAvatarForArtisan = (id: number) => AVATAR_ICONS[id % AVATAR_ICONS.length];
+const AVATARS = [ppAvatar1, ppAvatar2, ppAvatar3, ppAvatar4];
+const getAvatarForArtisan = (id: number) => AVATARS[id % AVATARS.length];
 
 // ─── Address Suggestion Interface ────────────────────────────────────────────
 
@@ -99,6 +72,7 @@ interface AddressSuggestion {
 
 export function TrouverArtisan() {
     const navigate = useNavigate();
+
     // Location search state
     const [locationQuery, setLocationQuery] = useState('');
     const [locationSuggestions, setLocationSuggestions] = useState<AddressSuggestion[]>([]);
@@ -110,6 +84,11 @@ export function TrouverArtisan() {
     const [filteredCategories, setFilteredCategories] = useState<CategoryItem[]>([]);
     const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
     const categoryRef = useRef<HTMLDivElement>(null);
+
+    // Artisans from API
+    const [artisans, setArtisans] = useState<Artisan[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     // Close dropdowns on outside click
     useEffect(() => {
@@ -124,6 +103,38 @@ export function TrouverArtisan() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    // ── Fetch artisans from API ───────────────────────────────────────────────
+
+    useEffect(() => {
+        loadArtisans();
+    }, []);
+
+    const loadArtisans = async (filters: { code_postal?: string; categorie?: string } = {}) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await fetchArtisans({
+                ...filters,
+                limit: 50,
+            });
+            setArtisans(data);
+        } catch (err) {
+            console.error('Erreur lors du chargement des artisans:', err);
+            setError('Impossible de charger les artisans');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ── Search trigger ────────────────────────────────────────────────────────
+
+    const handleSearch = () => {
+        const filters: { code_postal?: string; categorie?: string; search?: string } = {};
+        if (locationQuery) filters.code_postal = locationQuery;
+        if (categoryQuery) filters.categorie = categoryQuery;
+        loadArtisans(filters);
+    };
 
     // ── Location autocomplete ────────────────────────────────────────────────
 
@@ -177,7 +188,7 @@ export function TrouverArtisan() {
 
     // ── Render helpers ───────────────────────────────────────────────────────
 
-    const renderArtisanCard = (artisan: MockArtisan) => (
+    const renderArtisanCard = (artisan: Artisan) => (
         <div
             key={artisan.id}
             onClick={() => navigate(`/artisan/${artisan.id}`)}
@@ -187,60 +198,47 @@ export function TrouverArtisan() {
                 {/* Header: avatar + info + rating */}
                 <div className="flex items-start gap-3 mb-4">
                     <img
-                        src={getAvatarForArtisan(artisan.id)}
-                        alt={`Avatar de ${artisan.name}`}
+                        src={getProfilePhotoUrl(artisan.id)}
+                        alt={`Avatar de ${artisan.Prenom} ${artisan.Nom}`}
                         className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                        onError={(e) => { (e.target as HTMLImageElement).src = getAvatarForArtisan(artisan.id); }}
                     />
                     <div className="flex-1 min-w-0">
-                        <h4 className="text-base font-bold text-fixup-black truncate">{artisan.name}</h4>
-                        <p className="text-xs text-fixup-black/60 truncate">{artisan.city}</p>
-                        <p className="text-xs text-fixup-black/40">{artisan.onlineSince}</p>
+                        <h4 className="text-base font-bold text-fixup-black truncate">
+                            {artisan.Prenom} {artisan.Nom?.charAt(0)}.
+                        </h4>
+                        <p className="text-xs text-fixup-black/60 truncate">
+                            {artisan.ville || artisan.Code_postal || 'Localisation non renseignée'}
+                        </p>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                         <Star className="w-4 h-4 text-fixup-orange fill-fixup-orange" />
-                        <span className="text-sm font-bold text-fixup-black">{artisan.rating}/5</span>
-                        <span className="text-xs text-fixup-black/50">({artisan.reviews} avis)</span>
+                        <span className="text-sm font-bold text-fixup-black">
+                            {artisan.note_moyenne?.toFixed(1) || '–'}/5
+                        </span>
+                        <span className="text-xs text-fixup-black/50">
+                            ({artisan.nombre_avis || 0} avis)
+                        </span>
                     </div>
                 </div>
 
-                {/* Placeholder boxes (photos / réparation / phone) */}
-                <div className="grid grid-cols-3 gap-2">
-                    {['photos', 'réparation', 'phone'].map((label) => (
-                        <div
-                            key={label}
-                            className="bg-gray-100 rounded-lg h-16 flex items-center justify-center"
-                        >
-                            <span className="text-[10px] text-gray-400 italic">{label}</span>
-                        </div>
-                    ))}
-                </div>
+                {/* Description preview */}
+                {artisan.description && (
+                    <p className="text-xs text-fixup-black/60 line-clamp-2 mb-3">
+                        {artisan.description}
+                    </p>
+                )}
+
+                {/* Tags */}
+                {artisan.Domaine_activite && (
+                    <div className="flex flex-wrap gap-1">
+                        <span className="px-2 py-0.5 bg-fixup-green/10 text-fixup-green text-[10px] font-medium rounded-full">
+                            {artisan.Domaine_activite}
+                        </span>
+                    </div>
+                )}
             </div>
         </div>
-    );
-
-    const renderCategorySection = (
-        title: string,
-        profileCount: number,
-        artisans: MockArtisan[]
-    ) => (
-        <section className="mb-16">
-            <div className="border-t-2 border-gray-200 pt-8 mb-6">
-                <h2 className="text-2xl font-bold text-fixup-black">{title}</h2>
-                <p className="text-sm text-fixup-green font-medium mt-1 italic">
-                    {profileCount} profils compétents
-                </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {artisans.map(renderArtisanCard)}
-            </div>
-
-            <div className="flex justify-center mt-8">
-                <button className="px-6 py-2.5 border-2 border-fixup-green text-fixup-black text-sm font-medium rounded-full hover:bg-fixup-green/10 transition-colors duration-200">
-                    Voir tous les profils
-                </button>
-            </div>
-        </section>
     );
 
     // ── Main render ──────────────────────────────────────────────────────────
@@ -290,7 +288,7 @@ export function TrouverArtisan() {
                     </div>
 
                     {/* Par catégorie */}
-                    <div ref={categoryRef}>
+                    <div className="mb-5" ref={categoryRef}>
                         <label className="block text-sm font-semibold text-fixup-black mb-2">Par catégorie</label>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -326,12 +324,48 @@ export function TrouverArtisan() {
                             )}
                         </div>
                     </div>
+
+                    {/* Search button */}
+                    <button
+                        onClick={handleSearch}
+                        className="w-full py-3 bg-fixup-black text-white font-semibold rounded-lg hover:bg-fixup-black/80 transition-colors duration-200 flex items-center justify-center gap-2"
+                    >
+                        <Search className="w-5 h-5" />
+                        Rechercher
+                    </button>
                 </div>
 
                 {/* ── Results Section ───────────────────────────────────────────── */}
-                {renderCategorySection('Produits éléctroniques', 40, MOCK_ARTISANS)}
-                {renderCategorySection('Gros éléctroménager', 32, MOCK_ARTISANS)}
-                {renderCategorySection('Petit éléctroménager', 53, MOCK_ARTISANS)}
+                <section>
+                    <div className="border-t-2 border-gray-200 pt-8 mb-6">
+                        <h2 className="text-2xl font-bold text-fixup-black">Artisans disponibles</h2>
+                        <p className="text-sm text-fixup-green font-medium mt-1 italic">
+                            {artisans.length} profil{artisans.length > 1 ? 's' : ''} trouvé{artisans.length > 1 ? 's' : ''}
+                        </p>
+                    </div>
+
+                    {loading ? (
+                        <LoadingSpinner message="Chargement des artisans..." />
+                    ) : error ? (
+                        <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-fixup-blue/20">
+                            <p className="text-red-500 mb-4">{error}</p>
+                            <button
+                                onClick={() => loadArtisans()}
+                                className="px-6 py-2 bg-fixup-blue text-white rounded-lg hover:bg-fixup-blue/90 transition-colors"
+                            >
+                                Réessayer
+                            </button>
+                        </div>
+                    ) : artisans.length === 0 ? (
+                        <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-fixup-blue/20">
+                            <p className="text-fixup-black/60">Aucun artisan trouvé pour cette recherche.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {artisans.map(renderArtisanCard)}
+                        </div>
+                    )}
+                </section>
             </div>
         </div>
     );

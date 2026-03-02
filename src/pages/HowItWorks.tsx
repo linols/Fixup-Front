@@ -30,7 +30,7 @@ export function HowItWorks() {
   ];
 
   return (
-    <div className="py-32 px-4 bg-gray-100">
+    <div id="comment-ca-marche" className="py-32 px-4 bg-gray-100">
       <div className="max-w-7xl mx-auto">
         <div className="relative mb-20">
           <h2 className="text-3xl sm:text-4xl font-bold text-fixup-black flex flex-col sm:flex-row items-center justify-center max-w-xs sm:max-w-none mx-auto">
