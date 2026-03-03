@@ -11,6 +11,7 @@ import {
     fetchArtisanPhotos,
     getPhotoUrl,
     postDemande,
+    postAvis,
     getProfilePhotoUrl,
     getArtisanCoverPhotoUrl,
     fetchArtisanCoverPhotoMetadata
@@ -95,6 +96,15 @@ export function ProfilArtisan() {
     const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
     const [allCategoriesChecked, setAllCategoriesChecked] = useState(true);
 
+    // New review state
+    const [showAvisModal, setShowAvisModal] = useState(false);
+    const [nouvelAvisNote, setNouvelAvisNote] = useState(5);
+    const [nouvelAvisCommentaire, setNouvelAvisCommentaire] = useState('');
+    const [nouvelAvisCategorie, setNouvelAvisCategorie] = useState('');
+    const [avisSending, setAvisSending] = useState(false);
+    const [avisError, setAvisError] = useState('');
+    const [avisSuccess, setAvisSuccess] = useState('');
+
     // ── Fetch data ────────────────────────────────────────────────────────────
 
     useEffect(() => {
@@ -112,7 +122,9 @@ export function ProfilArtisan() {
                         fetchArtisanCoverPhotoMetadata(artisanId),
                     ]);
 
-                if (profileData.status === 'fulfilled') setProfile(profileData.value);
+                if (profileData.status === 'fulfilled') {
+                    setProfile(profileData.value);
+                }
                 else throw new Error('Profil introuvable');
 
                 if (categoriesData.status === 'fulfilled') setCategories(categoriesData.value);
@@ -196,6 +208,48 @@ export function ProfilArtisan() {
         }
     };
 
+    const handleSendAvis = async () => {
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+            navigate('/login');
+            return;
+        }
+        setAvisSending(true);
+        setAvisError('');
+        try {
+            await postAvis({
+                utilisateur_id: parseInt(userId),
+                professionnel_id: artisanId,
+                note: nouvelAvisNote,
+                commentaire: nouvelAvisCommentaire,
+                categorie: nouvelAvisCategorie || undefined
+            });
+
+            setAvisSuccess('Avis posté avec succès !');
+            setNouvelAvisNote(5);
+            setNouvelAvisCommentaire('');
+            setNouvelAvisCategorie('');
+
+            // Rafraîchir les avis
+            const [reviewsData, statsData] = await Promise.all([
+                fetchArtisanAvis(artisanId, { limit: 50 }),
+                fetchArtisanAvisStats(artisanId)
+            ]);
+            setReviews(reviewsData);
+            setAvisStats(statsData);
+
+            setTimeout(() => {
+                setShowAvisModal(false);
+                setAvisSuccess('');
+            }, 2000);
+        } catch (err: any) {
+            console.error('Erreur envoi avis:', err);
+            setAvisError(err.message || 'Impossible d\'envoyer l\'avis.');
+        } finally {
+            setAvisSending(false);
+        }
+    };
+
     // ── Derived data ──────────────────────────────────────────────────────────
 
     // Get unique categories that have reviews
@@ -245,9 +299,6 @@ export function ProfilArtisan() {
         setAllCategoriesChecked(true);
         setSelectedFilters([]);
     };
-
-    // Get first few items for sidebar display
-    const sidebarItems = categories.flatMap((c) => c.items).slice(0, 7);
 
     // Group all categories by main category for "Voir tout"
     const groupedCategories = categories.reduce<
@@ -357,7 +408,7 @@ export function ProfilArtisan() {
                     <div>
                         <h1 className="text-2xl font-bold text-fixup-black">{displayName}</h1>
                         <p className="text-sm text-fixup-black/70">{profile.poste || profile.Domaine_activite || ''}</p>
-                        <p className="text-sm text-fixup-black/50">
+                        <p className="text-sm text-fixup-black/50 mt-2">
                             {profile.Adresse || profile.Code_postal || ''}
                         </p>
                     </div>
@@ -435,27 +486,46 @@ export function ProfilArtisan() {
             <div className="w-full h-px bg-gray-200 mt-6 mb-6"></div>
 
             {/* Category tags */}
-            {sidebarItems.length > 0 && (
+            {profile.tags && profile.tags.length > 0 && (
                 <div className="flex flex-col items-center text-center w-full">
                     <p className="text-xl font-semibold text-fixup-black mb-6">
                         Répond aux demandes de
                     </p>
                     <div className="flex flex-wrap justify-center gap-3">
-                        {sidebarItems.map((item) => (
-                            <span
-                                key={item}
-                                className="px-4 py-2 bg-[#DDF1FF] rounded-lg text-[15px] font-medium text-fixup-black"
-                            >
-                                {item}
-                            </span>
-                        ))}
+                        {(() => {
+                            // Extract values: try items first, fallback to subcategory, then mainCategory
+                            let displayTags = profile.tags.flatMap(tag => {
+                                if (tag.items && tag.items.length > 0) return tag.items;
+                                if (tag.subcategory) return [tag.subcategory];
+                                if (tag.mainCategory) return [tag.mainCategory];
+                                return [];
+                            });
+
+                            // Remove duplicates
+                            displayTags = Array.from(new Set(displayTags));
+
+                            return (
+                                <>
+                                    {displayTags.slice(0, 9).map((item, idx) => (
+                                        <span
+                                            key={`${item}-${idx}`}
+                                            className="px-3 py-1.5 bg-[#DDF1FF] rounded-md text-[13px] font-medium text-fixup-black"
+                                        >
+                                            {item}
+                                        </span>
+                                    ))}
+                                    {displayTags.length > 9 && (
+                                        <button
+                                            onClick={() => setShowVoirTout(true)}
+                                            className="mt-6 px-8 py-2.5 border-2 border-fixup-green text-fixup-black text-[17px] font-bold rounded-xl hover:bg-fixup-green/10 transition-colors bg-white shadow-sm"
+                                        >
+                                            Voir tout
+                                        </button>
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
-                    <button
-                        onClick={() => setShowVoirTout(true)}
-                        className="mt-6 px-8 py-2.5 border-2 border-fixup-green text-fixup-black text-[17px] font-bold rounded-xl hover:bg-fixup-green/10 transition-colors bg-white shadow-sm"
-                    >
-                        Voir tout
-                    </button>
                 </div>
             )}
 
@@ -570,10 +640,18 @@ export function ProfilArtisan() {
             </div>
 
             {/* Filtrer button */}
-            <div className="flex justify-center">
+            <div className="flex flex-col gap-3 items-center justify-center">
+                {localStorage.getItem('userRole') === 'particulier' && (
+                    <button
+                        onClick={() => setShowAvisModal(true)}
+                        className="px-6 py-2 w-full bg-fixup-orange text-white text-sm font-bold rounded-full hover:bg-fixup-green transition-colors"
+                    >
+                        Laisser un avis
+                    </button>
+                )}
                 <button
                     onClick={() => setShowFiltre(true)}
-                    className="px-6 py-2 border-2 border-fixup-blue text-fixup-black text-sm font-medium rounded-full hover:bg-fixup-blue/10 transition-colors"
+                    className="px-6 py-2 w-full border-2 border-fixup-blue text-fixup-black text-sm font-medium rounded-full hover:bg-fixup-blue/10 transition-colors"
                 >
                     Filtrer
                 </button>
@@ -967,6 +1045,91 @@ export function ProfilArtisan() {
         );
     };
 
+    // ── Modal: Laisser un avis ────────────────────────────────────────────────
+
+    const renderAvisModal = () => {
+        if (!showAvisModal) return null;
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/40" onClick={() => setShowAvisModal(false)} />
+                <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
+                    <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                        <h2 className="text-lg font-bold text-fixup-black">
+                            Laisser un avis
+                        </h2>
+                        <button
+                            onClick={() => setShowAvisModal(false)}
+                            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                        >
+                            <X className="w-5 h-5 text-fixup-black/60" />
+                        </button>
+                    </div>
+
+                    <div className="overflow-y-auto p-6 space-y-6">
+                        {avisSuccess && (
+                            <div className="p-3 bg-fixup-green/10 text-fixup-green rounded-lg text-sm font-medium">
+                                {avisSuccess}
+                            </div>
+                        )}
+                        {avisError && (
+                            <div className="p-3 bg-red-100 text-red-700 rounded-lg text-sm font-medium">
+                                {avisError}
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="block text-sm font-medium text-fixup-black mb-2">Note sur 5</label>
+                            <div className="flex gap-2">
+                                {[1, 2, 3, 4, 5].map(star => (
+                                    <button
+                                        key={star}
+                                        type="button"
+                                        onClick={() => setNouvelAvisNote(star)}
+                                        className="focus:outline-none"
+                                    >
+                                        <Star className={`w-8 h-8 ${nouvelAvisNote >= star ? 'text-fixup-orange fill-fixup-orange' : 'text-gray-300'}`} />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-fixup-black mb-2">Prestation concernée (optionnel)</label>
+                            <input
+                                type="text"
+                                value={nouvelAvisCategorie}
+                                onChange={(e) => setNouvelAvisCategorie(e.target.value)}
+                                placeholder="Ex: Informatique, Plomberie..."
+                                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-fixup-black focus:outline-none focus:border-fixup-orange focus:ring-1 focus:ring-fixup-orange"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-fixup-black mb-2">Votre commentaire</label>
+                            <textarea
+                                value={nouvelAvisCommentaire}
+                                onChange={(e) => setNouvelAvisCommentaire(e.target.value)}
+                                placeholder="Partagez votre expérience..."
+                                rows={4}
+                                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm text-fixup-black placeholder:text-fixup-black/30 focus:outline-none focus:border-fixup-orange focus:ring-1 focus:ring-fixup-orange resize-none"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="p-6 border-t border-gray-100">
+                        <button
+                            onClick={handleSendAvis}
+                            disabled={avisSending || !nouvelAvisCommentaire}
+                            className="w-full py-2.5 bg-fixup-green text-fixup-black text-sm font-bold rounded-full hover:bg-fixup-orange hover:text-white transition-all duration-200 disabled:opacity-50"
+                        >
+                            {avisSending ? 'Envoi en cours...' : 'Poster l\'avis'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     // ── Main render ──────────────────────────────────────────────────────────
 
     return (
@@ -997,6 +1160,7 @@ export function ProfilArtisan() {
             {renderVoirToutModal()}
             {renderFiltreModal()}
             {renderDemandeModal()}
+            {renderAvisModal()}
         </div>
     );
 }

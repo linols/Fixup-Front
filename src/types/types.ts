@@ -11,7 +11,7 @@ export interface Artisan {
     tags?: ArtisanCategory[];
     note_moyenne: number;
     nombre_avis: number;
-    statut_disponibilite?: string;
+    statut_disponibilite?: Record<string, any> | string | null;
     description?: string;
 }
 

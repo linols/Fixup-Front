@@ -118,7 +118,43 @@ export function TrouverArtisan() {
                 ...filters,
                 limit: 50,
             });
-            setArtisans(data);
+
+            // ── Tri de "Proximité" (Code Postal) ──────────────────────────────────
+            let sortedData = [...data];
+            if (filters.code_postal) {
+                // Essayer d'extraire le code postal de la saisie (ex: "75001 Paris")
+                const searchPostalMatch = filters.code_postal.match(/\b\d{5}\b/);
+                if (searchPostalMatch) {
+                    const searchPostal = searchPostalMatch[0];
+                    const searchDept = searchPostal.substring(0, 2);
+
+                    sortedData.sort((a, b) => {
+                        const getArtisanPostal = (art: Artisan) => {
+                            if (art.Code_postal) return art.Code_postal.toString();
+                            const match = art.ville?.match(/\b\d{5}\b/);
+                            return match ? match[0] : '';
+                        };
+
+                        const cpA = getArtisanPostal(a);
+                        const cpB = getArtisanPostal(b);
+
+                        // Critère 1: Code postal exact
+                        const isExactA = cpA === searchPostal ? 1 : 0;
+                        const isExactB = cpB === searchPostal ? 1 : 0;
+                        if (isExactA !== isExactB) return isExactB - isExactA;
+
+                        // Critère 2: Même département
+                        const deptA = cpA.substring(0, 2);
+                        const deptB = cpB.substring(0, 2);
+                        const isSameDeptA = deptA === searchDept ? 1 : 0;
+                        const isSameDeptB = deptB === searchDept ? 1 : 0;
+                        if (isSameDeptA !== isSameDeptB) return isSameDeptB - isSameDeptA;
+
+                        return 0; // Conservation de l'ordre par défaut pour les autres
+                    });
+                }
+            }
+            setArtisans(sortedData);
         } catch (err) {
             console.error('Erreur lors du chargement des artisans:', err);
             setError('Impossible de charger les artisans');
@@ -127,12 +163,29 @@ export function TrouverArtisan() {
         }
     };
 
-    // ── Search trigger ────────────────────────────────────────────────────────
+    // ── Search triggers for Live Search ───────────────────────────────────────
 
-    const handleSearch = () => {
-        const filters: { code_postal?: string; categorie?: string; search?: string } = {};
-        if (locationQuery) filters.code_postal = locationQuery;
-        if (categoryQuery) filters.categorie = categoryQuery;
+    // Triggered when a tag/location is clicked in the dropdown
+    const handleLiveSearch = (newLoc?: string, newCat?: string) => {
+        const filters: { code_postal?: string; categorie?: string } = {};
+
+        const loc = newLoc !== undefined ? newLoc : locationQuery;
+        if (loc) {
+            // Contournement du bug backend: on extrait nous-mêmes strictement les 5 chiffres du CP
+            // pour éviter que le backend ne capture le numéro de rue ("36")
+            const match5 = loc.match(/\b\d{5}\b/);
+            filters.code_postal = match5 ? match5[0] : loc;
+        }
+
+        const cat = newCat !== undefined ? newCat : categoryQuery;
+        if (cat) {
+            // Si la chaîne correspond à un nom de catégorie long affiché dans l'UI (ex: "Ordinateurs (PC...)"),
+            // on la convertit automatiquement en son tag réel ("Informatique et Bureautique") pour l'API.
+            const matchedCategory = CATEGORIES.find(c => c.name === cat);
+            filters.categorie = matchedCategory ? matchedCategory.subcategory : cat;
+        }
+
+        // Only trigger search if at least one field is used, or reset
         loadArtisans(filters);
     };
 
@@ -152,8 +205,9 @@ export function TrouverArtisan() {
                 );
                 const data = await res.json();
                 const suggestions: AddressSuggestion[] = data.features.map(
-                    (f: { properties: { label: string; context: string } }) => ({
-                        label: f.properties.label,
+                    (f: { properties: { label: string; context: string; postcode?: string } }) => ({
+                        // On sécurise la présence du code postal même pour les simples villes
+                        label: `${f.properties.label} ${f.properties.postcode ? `(${f.properties.postcode})` : ''}`.trim(),
                         context: f.properties.context,
                     })
                 );
@@ -165,6 +219,13 @@ export function TrouverArtisan() {
         }, 300);
 
         return () => clearTimeout(timer);
+    }, [locationQuery]);
+
+    // Relance la recherche globale instantanément si l'utilisateur vide complètement la barre de lieu
+    useEffect(() => {
+        if (locationQuery === '') {
+            loadArtisans({ code_postal: '', categorie: categoryQuery });
+        }
     }, [locationQuery]);
 
     // ── Category filtering ───────────────────────────────────────────────────
@@ -184,6 +245,13 @@ export function TrouverArtisan() {
         );
         setFilteredCategories(results);
         setShowCategoryDropdown(results.length > 0);
+    }, [categoryQuery]);
+
+    // Relance la recherche instantanément si l'utilisateur vide complètement la barre de catégorie
+    useEffect(() => {
+        if (categoryQuery === '') {
+            loadArtisans({ code_postal: locationQuery, categorie: '' });
+        }
     }, [categoryQuery]);
 
     // ── Render helpers ───────────────────────────────────────────────────────
@@ -230,11 +298,31 @@ export function TrouverArtisan() {
                 )}
 
                 {/* Tags */}
-                {artisan.Domaine_activite && (
-                    <div className="flex flex-wrap gap-1">
-                        <span className="px-2 py-0.5 bg-fixup-green/10 text-fixup-green text-[10px] font-medium rounded-full">
-                            {artisan.Domaine_activite}
-                        </span>
+                {(artisan.Domaine_activite || (artisan.tags && Array.isArray(artisan.tags) && artisan.tags.length > 0)) && (
+                    <div className="flex flex-wrap gap-1 mt-3">
+                        {artisan.Domaine_activite && (
+                            <span className="px-2 py-0.5 bg-fixup-green/10 text-fixup-green text-[10px] font-medium rounded-full">
+                                {artisan.Domaine_activite}
+                            </span>
+                        )}
+                        {artisan.tags && Array.isArray(artisan.tags) && artisan.tags.map((tag: any, idx) => {
+                            let tagLabel = '';
+                            if (typeof tag === 'string') {
+                                tagLabel = tag;
+                            } else if (tag && typeof tag === 'object') {
+                                tagLabel = tag.subcategory || tag.mainCategory || '';
+                            }
+                            if (!tagLabel) return null;
+
+                            // Ne pas afficher deux fois la même chose que le domaine d'activité
+                            if (tagLabel.toLowerCase() === artisan.Domaine_activite?.toLowerCase()) return null;
+
+                            return (
+                                <span key={idx} className="px-2 py-0.5 bg-fixup-blue/10 text-fixup-blue text-[10px] font-medium rounded-full">
+                                    {tagLabel}
+                                </span>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -277,6 +365,7 @@ export function TrouverArtisan() {
                                             onClick={() => {
                                                 setLocationQuery(s.label);
                                                 setShowLocationDropdown(false);
+                                                handleLiveSearch(s.label, undefined);
                                             }}
                                         >
                                             {s.label}
@@ -312,6 +401,7 @@ export function TrouverArtisan() {
                                             onClick={() => {
                                                 setCategoryQuery(c.name);
                                                 setShowCategoryDropdown(false);
+                                                handleLiveSearch(undefined, c.subcategory);
                                             }}
                                         >
                                             <span>{c.name}</span>
@@ -324,15 +414,6 @@ export function TrouverArtisan() {
                             )}
                         </div>
                     </div>
-
-                    {/* Search button */}
-                    <button
-                        onClick={handleSearch}
-                        className="w-full py-3 bg-fixup-black text-white font-semibold rounded-lg hover:bg-fixup-black/80 transition-colors duration-200 flex items-center justify-center gap-2"
-                    >
-                        <Search className="w-5 h-5" />
-                        Rechercher
-                    </button>
                 </div>
 
                 {/* ── Results Section ───────────────────────────────────────────── */}

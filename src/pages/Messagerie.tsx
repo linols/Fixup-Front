@@ -6,6 +6,7 @@ import {
     fetchMessages,
     sendMessage as sendMessageApi,
     markAllRead,
+    getProfilePhotoUrl,
 } from '../services/api';
 import { useMessageStream } from '../hooks/useMessageStream';
 import type { Conversation, Message } from '../types/types';
@@ -248,9 +249,10 @@ export function Messagerie() {
                                 }`}
                         >
                             <img
-                                src={getAvatar(conv.interlocuteur_id)}
+                                src={getProfilePhotoUrl(conv.interlocuteur_id)}
+                                onError={(e) => { (e.target as HTMLImageElement).src = getAvatar(conv.interlocuteur_id); }}
                                 alt=""
-                                className="w-12 h-12 rounded-full flex-shrink-0"
+                                className="w-12 h-12 rounded-full flex-shrink-0 object-cover"
                             />
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between">
@@ -283,9 +285,10 @@ export function Messagerie() {
                         className="w-full text-left p-4 flex items-center gap-3 border-b border-gray-100 bg-fixup-green/10"
                     >
                         <img
-                            src={getAvatar(parseInt(contactId))}
+                            src={getProfilePhotoUrl(parseInt(contactId))}
+                            onError={(e) => { (e.target as HTMLImageElement).src = getAvatar(parseInt(contactId!)); }}
                             alt=""
-                            className="w-12 h-12 rounded-full"
+                            className="w-12 h-12 rounded-full object-cover"
                         />
                         <div>
                             <p className="font-semibold text-sm text-fixup-black">Nouvelle conversation</p>
@@ -318,9 +321,9 @@ export function Messagerie() {
         }
 
         return (
-            <div className={`flex-1 flex flex-col bg-gray-50 ${!selectedConvId && !contactId ? 'hidden md:flex' : ''}`}>
+            <div className={`flex-1 flex flex-col min-h-0 overflow-hidden bg-gray-50 ${!selectedConvId && !contactId ? 'hidden md:flex' : ''}`}>
                 {/* Chat header */}
-                <div className="bg-white border-b border-fixup-blue/20 p-4 flex items-center gap-3">
+                <div className="bg-white border-b border-fixup-blue/20 p-4 flex items-center gap-3 shadow-sm z-10">
                     <button
                         onClick={() => setSelectedConvId(null)}
                         className="md:hidden p-1 rounded-lg hover:bg-gray-100"
@@ -328,9 +331,10 @@ export function Messagerie() {
                         <ArrowLeft className="w-5 h-5 text-fixup-black" />
                     </button>
                     <img
-                        src={getAvatar(interlocuteur?.Id_user || parseInt(contactId || '0'))}
+                        src={getProfilePhotoUrl(interlocuteur?.Id_user || parseInt(contactId || '0'))}
+                        onError={(e) => { (e.target as HTMLImageElement).src = getAvatar(interlocuteur?.Id_user || parseInt(contactId || '0')); }}
                         alt=""
-                        className="w-10 h-10 rounded-full"
+                        className="w-10 h-10 rounded-full object-cover"
                     />
                     <div>
                         <p className="font-semibold text-sm text-fixup-black">

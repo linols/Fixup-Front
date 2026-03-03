@@ -1,7 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { LogIn, CircleUser, Users, HelpCircle, MessageCircle } from 'lucide-react';
+import { LogIn, CircleUser, Users, HelpCircle, MessageCircle, ChevronDown, Camera, LogOut } from 'lucide-react';
 import { Logo } from './components/Logo';
+import { uploadProfilePhoto, getProfilePhotoUrl, fetchConversations } from './services/api';
+import { useMessageStream } from './hooks/useMessageStream';
 import avatar1 from './assets/pp-anonymes_Fixaly-01.png';
 import avatar2 from './assets/pp-anonymes_Fixaly-02.png';
 import avatar3 from './assets/pp-anonymes_Fixaly-03.png';
@@ -65,7 +67,7 @@ function PrivateRoute({
 
   React.useEffect(() => {
     if (!isAuthenticated) {
-      navigate('/login');
+      navigate('/login', { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
@@ -123,7 +125,10 @@ function HomePage() {
                 >
                   Trouver un artisan
                 </button>
-                <button className="px-8 py-3 bg-fixup-blue text-fixup-black font-medium rounded-lg shadow-lg hover:bg-fixup-orange transform hover:-translate-y-1 transition-all duration-200">
+                <button
+                  onClick={() => navigate('/register')}
+                  className="px-8 py-3 bg-fixup-blue text-fixup-black font-medium rounded-lg shadow-lg hover:bg-fixup-orange transform hover:-translate-y-1 transition-all duration-200"
+                >
                   Devenir partenaire
                 </button>
               </div>
@@ -213,6 +218,71 @@ function Navigation() {
     }
   };
 
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [showDropdown, setShowDropdown] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const userId = localStorage.getItem('userId');
+  const [avatarTimestamp, setAvatarTimestamp] = React.useState(Date.now());
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  // Charger le total initial de messages non lus
+  React.useEffect(() => {
+    if (isAuthenticated && userId) {
+      fetchConversations(userId)
+        .then((convs) => {
+          const total = convs.reduce((sum, c) => sum + (c.non_lus || 0), 0);
+          setUnreadCount(total);
+        })
+        .catch((err) => console.error("Erreur chargement infos de messagerie:", err));
+    }
+  }, [isAuthenticated, userId]);
+
+  // Maintenir le total en temps réel via SSE
+  useMessageStream({
+    userId: isAuthenticated ? userId : null,
+    onNewMessage: (data) => {
+      // Ignorer si on est l'expéditeur (le badge est pour les reçus)
+      if (data.expediteur_id !== parseInt(userId || '0')) {
+        setUnreadCount((prev) => prev + 1);
+      }
+    },
+    onMessageRead: () => {
+      // Idéalement on met le compte à jour lors de la lecture, 
+      // pour faire simple via stream on peut refetch si besoin :
+      if (userId) {
+        fetchConversations(userId).then(convs => {
+          setUnreadCount(convs.reduce((sum, c) => sum + (c.non_lus || 0), 0));
+        });
+      }
+    }
+  });
+
+  // Handle clicking outside the dropdown to close it
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && userId) {
+      try {
+        await uploadProfilePhoto(userId, file);
+        // Force l'actualisation de l'image
+        setAvatarTimestamp(Date.now());
+      } catch (error) {
+        console.error("Erreur lors de l'upload de la photo :", error);
+        alert("Impossible de modifier la photo.");
+      }
+    }
+    setShowDropdown(false);
+  };
+
   return (
     <nav className="fixed top-0 left-0 right-0 bg-white shadow-sm z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -244,26 +314,68 @@ function Navigation() {
             {/* Connexion/Déconnexion aligné à droite */}
             <div className="ml-8 flex items-center gap-3">
               {isAuthenticated && (
-                <button
-                  onClick={() => navigate('/messagerie')}
-                  className="relative p-2 rounded-full hover:bg-fixup-blue/10 transition-colors"
-                  title="Messages"
-                >
-                  <MessageCircle className="w-5 h-5 text-fixup-black" />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => navigate('/messagerie')}
+                    className="relative p-2 rounded-full hover:bg-fixup-blue/10 transition-colors"
+                    title="Messages"
+                  >
+                    <MessageCircle className="w-5 h-5 text-fixup-black" />
+                  </button>
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 block w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
+                  )}
+                </div>
               )}
               {isAuthenticated ? (
-                <button
-                  onClick={handleLogout}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-full text-sm font-medium text-fixup-black bg-white hover:bg-gray-50 hover:border-fixup-orange transition-all duration-200 shadow-sm"
-                >
-                  <img
-                    src={userAvatarSrc}
-                    alt="avatar"
-                    className="w-7 h-7 rounded-full object-cover"
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    onClick={() => setShowDropdown(!showDropdown)}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-full text-sm font-medium text-fixup-black bg-white hover:bg-gray-50 hover:border-fixup-orange transition-all duration-200 shadow-sm focus:outline-none"
+                  >
+                    <img
+                      src={userId ? `${getProfilePhotoUrl(userId)}?t=${avatarTimestamp}` : userAvatarSrc}
+                      alt="avatar"
+                      onError={(e) => { (e.target as HTMLImageElement).src = userAvatarSrc; }}
+                      className="w-7 h-7 rounded-full object-cover"
+                    />
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  </button>
+
+                  {/* Bouton de fichier caché */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                    accept="image/*"
                   />
-                  <span className="text-xs text-gray-500">Déconnexion</span>
-                </button>
+
+                  {/* Dropdown Menu */}
+                  {showDropdown && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden">
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            fileInputRef.current?.click();
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-fixup-black hover:bg-fixup-blue/10 flex items-center gap-2 transition-colors"
+                        >
+                          <Camera className="w-4 h-4 text-fixup-blue" />
+                          Modifier ma photo
+                        </button>
+                        <div className="border-t border-gray-100 my-1"></div>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Déconnexion
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <button
                   onClick={() => navigate('/login')}
@@ -311,10 +423,9 @@ export function App() {
           <Route
             path="/trouver-artisan"
             element={
-              <>
-                <Navigation />
+              <PrivateRoute requiresParticulier={true}>
                 <TrouverArtisan />
-              </>
+              </PrivateRoute>
             }
           />
           <Route
