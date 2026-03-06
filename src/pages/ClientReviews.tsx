@@ -6,10 +6,10 @@ const reviews = [
         name: 'Sophie M.',
         avatar: 'https://i.pravatar.cc/80?img=47',
         rating: 5,
-        job: 'Renovation salle de bain',
-        location: 'Paris 11e',
+        job: 'Réparation ordinateur portable',
+        location: 'Angers',
         comment:
-            "Artisan tres professionnel, ponctuel et soigneux. Le resultat est impeccable, je recommande vivement !",
+            "Mon PC ne s'allumait plus du tout, l'artisan a diagnostiqué et remplacé la carte mère en moins de 48h. Comme neuf !",
         date: 'Janvier 2025',
     },
     {
@@ -17,32 +17,32 @@ const reviews = [
         name: 'Thomas R.',
         avatar: 'https://i.pravatar.cc/80?img=12',
         rating: 5,
-        job: 'Installation cuisine equipee',
-        location: 'Lyon 3e',
+        job: 'Réparation lave-linge',
+        location: 'Angers',
         comment:
-            "Excellent travail, delais respectes et tarifs competitifs. Notre cuisine est magnifique, merci !",
-        date: 'Fevrier 2025',
+            "Ma machine à laver fuyait à chaque cycle. Intervention rapide, pièce changée sur place. Impeccable, merci !",
+        date: 'Février 2025',
     },
     {
         id: 3,
         name: 'Camille D.',
         avatar: 'https://i.pravatar.cc/80?img=32',
         rating: 4,
-        job: 'Peinture salon & chambre',
-        location: 'Bordeaux',
+        job: 'Dépannage télévision',
+        location: 'Angers',
         comment:
-            "Tres satisfaite du resultat. L'artisan etait a l'ecoute et de bon conseil pour les couleurs.",
-        date: 'Decembre 2024',
+            "Mon écran Samsung avait des lignes verticales. L'artisan a trouvé le problème et l'a résolu rapidement. Très satisfaite !",
+        date: 'Décembre 2024',
     },
     {
         id: 4,
         name: 'Marc L.',
         avatar: 'https://i.pravatar.cc/80?img=57',
         rating: 5,
-        job: 'Plomberie & chauffage',
-        location: 'Nantes',
+        job: 'Réparation réfrigérateur',
+        location: 'Angers',
         comment:
-            "Intervention rapide et efficace. Probleme resolu en moins d'une heure. Je ferai encore appel a ce professionnel.",
+            "Mon frigo ne refroidissait plus. Le technicien est intervenu le jour même et a réglé le souci en une heure. Au top !",
         date: 'Novembre 2024',
     },
     {
@@ -50,10 +50,10 @@ const reviews = [
         name: 'Julie P.',
         avatar: 'https://i.pravatar.cc/80?img=25',
         rating: 5,
-        job: 'Pose de parquet',
-        location: 'Marseille 8e',
+        job: 'Réparation machine à café',
+        location: 'Angers',
         comment:
-            "Travail de qualite, propre et rapide. L'artisan a su s'adapter a nos contraintes. Parfait !",
+            "Ma Nespresso ne coulait plus. Plutôt que de la jeter, j'ai trouvé un réparateur sur Fixup. Résultat parfait et économique !",
         date: 'Octobre 2024',
     },
     {
@@ -61,10 +61,10 @@ const reviews = [
         name: 'Antoine B.',
         avatar: 'https://i.pravatar.cc/80?img=68',
         rating: 4,
-        job: 'Electricite & mise aux normes',
-        location: 'Lille',
+        job: 'Réparation smartphone',
+        location: 'Angers',
         comment:
-            "Tres competent, explications claires tout au long du chantier. Je recommande sans hesiter.",
+            "Écran de mon iPhone cassé, réparé en 30 minutes avec une pièce de qualité. Tarif très correct, je recommande sans hésiter.",
         date: 'Septembre 2024',
     },
 ];
@@ -151,12 +151,6 @@ export function ClientReviews() {
                     ))}
                 </div>
 
-                {/* CTA */}
-                <div className="text-center mt-12">
-                    <button className="inline-flex items-center px-6 py-3 border-2 border-fixup-green text-fixup-black font-medium rounded-lg hover:bg-fixup-green hover:text-white transition-colors duration-200">
-                        Voir tous les avis
-                    </button>
-                </div>
             </div>
         </div>
     );

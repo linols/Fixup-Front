@@ -24,6 +24,8 @@ import { ProfilArtisan } from './pages/ProfilArtisan';
 import { EditProfilArtisan } from './pages/EditProfilArtisan';
 import { Messagerie } from './pages/Messagerie';
 import { LegalPage } from './pages/LegalPage';
+import { RepairerTelephone } from './pages/RepairerTelephone';
+import { RepairerOrdinateur } from './pages/RepairerOrdinateur';
 
 const avatars: Record<string, string> = { '1': avatar1, '2': avatar2, '3': avatar3, '4': avatar4 };
 
@@ -113,6 +115,9 @@ function HomePage() {
             <div className="text-center relative z-10">
               <div className="max-w-2xl mx-auto mb-12">
                 <Logo size="large" variant="hero" className="w-full" />
+                <p className="mt-4 text-lg font-semibold text-fixup-black/70 italic tracking-wide">
+                  La réparation accessible !
+                </p>
               </div>
               <p className="mt-8 max-w-md mx-auto text-xl text-fixup-black font-coolvetica">
                 Connectez-vous avec les meilleurs artisans de votre région
@@ -483,6 +488,26 @@ export function App() {
               <>
                 <Navigation />
                 <LegalPage />
+                <Footer />
+              </>
+            }
+          />
+          <Route
+            path="/pourquoi-reparer-telephone"
+            element={
+              <>
+                <Navigation />
+                <RepairerTelephone />
+                <Footer />
+              </>
+            }
+          />
+          <Route
+            path="/comment-reparer-ordinateur"
+            element={
+              <>
+                <Navigation />
+                <RepairerOrdinateur />
                 <Footer />
               </>
             }

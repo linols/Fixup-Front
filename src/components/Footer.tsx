@@ -32,6 +32,8 @@ export function Footer({ variant = 'light' }: { variant?: 'light' | 'dark' }) {
               <li><a href="/#avis" className={textLinkClass}>Avis clients</a></li>
               <li><Link to="/login" className={textLinkClass}>Connexion / Inscription</Link></li>
               <li><Link to="/messagerie" className={textLinkClass}>Messagerie</Link></li>
+              <li><Link to="/pourquoi-reparer-telephone" className={textLinkClass}>Pourquoi réparer son téléphone ?</Link></li>
+              <li><Link to="/comment-reparer-ordinateur" className={textLinkClass}>Comment réparer son ordinateur ?</Link></li>
             </ul>
           </div>
 

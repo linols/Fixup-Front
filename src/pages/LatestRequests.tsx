@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../config/api';
 
 interface LatestOffer {
   Id_devis: number;
@@ -16,8 +15,9 @@ interface LatestOffer {
 const getCategoryImage = (type?: string) => {
   const images: Record<string, string> = {
     'exterieur': 'https://images.unsplash.com/photo-1581141849291-1125c7b692b5?auto=format&fit=crop&q=80&w=500&h=300',
-    'informatique': 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=500&h=300',
-    'electronique': 'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?auto=format&fit=crop&q=80&w=500&h=300',
+    'informatique': 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&q=80&w=500&h=300',
+    'electronique': 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&q=80&w=500&h=300',
+    'gros_electromenager': 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&q=80&w=500&h=300',
     'bois': 'https://images.unsplash.com/photo-1621905251918-48416bd8575a?auto=format&fit=crop&q=80&w=500&h=300',
   };
   return images[type || ''] || 'https://images.unsplash.com/photo-1581141849291-1125c7b692b5?auto=format&fit=crop&q=80&w=500&h=300';
@@ -28,6 +28,7 @@ const getCategoryTitle = (type?: string) => {
     'exterieur': 'Travaux extérieurs',
     'informatique': 'Réparation informatique',
     'electronique': 'Réparation électronique',
+    'gros_electromenager': 'Gros électroménager',
     'bois': 'Travaux bois',
   };
   return names[type || ''] || 'Demande de réparation';
@@ -37,22 +38,34 @@ export function LatestRequests() {
   const [requests, setRequests] = useState<LatestOffer[]>([]);
 
   useEffect(() => {
-    const loadRequests = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/offers`);
-        if (res.ok) {
-          const data = await res.json();
-          // Prendre les 3 dernières offres
-          setRequests(data.slice(0, 3));
-        }
-      } catch (err) {
-        console.error('Erreur chargement dernières demandes:', err);
+    // Données fictives pour la page d'accueil (remplace l'appel API)
+    const mockRequests: LatestOffer[] = [
+      {
+        Id_devis: 1,
+        type_reparation: 'informatique',
+        description: 'Mon ordinateur portable ne s\'allume plus du tout, même branché sur secteur. Besoin d\'un diagnostic et réparation si possible.',
+        Date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(), // Il y a 2 jours
+        Code_postal: '49000'
+      },
+      {
+        Id_devis: 2,
+        type_reparation: 'electronique',
+        description: 'Ma télévision affiche des lignes de couleurs verticales sur tout le côté droit de l\'écran. Marque Samsung.',
+        Date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(), // Il y a 5 jours
+        Code_postal: '49000'
+      },
+      {
+        Id_devis: 3,
+        type_reparation: 'gros_electromenager',
+        description: 'Mon lave-linge fuit par le bas à chaque cycle de rinçage. Marque Bosch, a environ 4 ans.',
+        Date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(), // Il y a 7 jours
+        Code_postal: '49000'
       }
-    };
-    loadRequests();
+    ];
+    setRequests(mockRequests);
   }, []);
 
-  // Fallback si pas de données
+  // Fallback si pas de données (ne devrait plus arriver avec les fakes)
   if (requests.length === 0) {
     return null;
   }
@@ -97,11 +110,6 @@ export function LatestRequests() {
           ))}
         </div>
 
-        <div className="text-center">
-          <button className="inline-flex items-center px-6 py-3 border-2 border-fixup-green text-fixup-black font-medium rounded-lg hover:bg-fixup-green hover:text-white transition-colors duration-200">
-            Voir toutes les demandes
-          </button>
-        </div>
       </div>
     </div>
   );
