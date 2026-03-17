@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Leaf, PiggyBank } from 'lucide-react';
+import { MapPin, Leaf, PiggyBank, BadgeCheck } from 'lucide-react';
 
 export function WhyChooseUs() {
   const benefits = [
@@ -34,10 +34,10 @@ export function WhyChooseUs() {
             </div>
             <span>choisir&nbsp;?</span>
           </h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 lg:gap-12">
             {benefits.map((benefit, index) => (
-              <div 
+              <div
                 key={index}
                 className="bg-gray-50 p-6 md:p-8 rounded-lg shadow-lg transform hover:-translate-y-2 transition-all duration-300 ease-in-out"
               >
@@ -56,6 +56,14 @@ export function WhyChooseUs() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Certification Section */}
+          <div className="mt-20 pt-8 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-center gap-4 text-fixup-orange font-medium">
+            <BadgeCheck className="w-8 h-8 flex-shrink-0 fill-fixup-orange text-white" />
+            <p className="text-center sm:text-left leading-relaxed max-w-3xl text-sm sm:text-base italic">
+              * Nous garantissons la fiabilité de nos interventions grâce à la certification (Agréé QualiRépar) de l'ensemble de nos artisans réparateurs.
+            </p>
           </div>
         </div>
       </div>
