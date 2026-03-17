@@ -113,10 +113,10 @@ function HomePage() {
         <div className="relative pt-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-16">
             <div className="text-center relative z-10">
-              <div className="max-w-2xl mx-auto mb-12">
+              <div className="max-w-4xl mx-auto mb-12">
                 <Logo size="large" variant="hero" className="w-full" />
-                <p className="mt-4 text-lg font-semibold text-fixup-black/70 italic tracking-wide">
-                  La réparation accessible !
+                <p className="-mt-4 text-5xl font-normal text-fixup-black font-coolvetica">
+                  La réparation accessible
                 </p>
               </div>
               <p className="mt-8 max-w-md mx-auto text-xl text-fixup-black font-coolvetica">
